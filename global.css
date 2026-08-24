@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 60 17% 98%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --primary: 22 100% 50%;
+    --primary-hover: 14 87% 55%;
+    --primary-tint: 21 85% 95%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
+    --destructive: 1 77% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 66% 40%;
+    --success-foreground: 0 0% 100%;
+    --success-tint: 139 53% 94%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 10%;
+    --warning-tint: 46 100% 94%;
+    --border: 36 25% 88%;
+    --border-strong: 0 0% 84%;
+  }
+}
