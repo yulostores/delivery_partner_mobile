@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Delivery-Partner",
-    "slug": "yulostores",
+    "slug": "yulodeliveryportal",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,13 +24,27 @@
     },
     "plugins": [
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Yulo Delivery Partner uses your location to match you with nearby orders and share your position with the customer during a delivery."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Yulo Delivery Partner accesses your photos so you can upload verification documents and a profile selfie.",
+          "cameraPermission": "Yulo Delivery Partner uses the camera to capture verification documents and your selfie.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "extra": {
       "eas": {
-        "projectId": "7aa59a0b-2aff-445b-83df-f805bbc0fe88"
+        "projectId": "55c78988-ecbd-40be-9177-d9da90797369"
       }
     },
-    "owner": "vescavia-team"
+    "owner": "vescavias-team"
   }
 }
