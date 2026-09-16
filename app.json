@@ -24,7 +24,14 @@
     },
     "plugins": [
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Yulo Delivery uses your location to send it to nearby orders and to show your position on the pickup/drop-off map while you're on duty."
+        }
+      ],
+      "@maplibre/maplibre-react-native"
     ],
     "extra": {
       "eas": {

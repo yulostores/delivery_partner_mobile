@@ -6,13 +6,22 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_HERE_API_KEY": "uYU2vTpGJ9NGqqop38f6bldw6cB_9VI51gxdAJhPJfc"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_HERE_API_KEY": "uYU2vTpGJ9NGqqop38f6bldw6cB_9VI51gxdAJhPJfc"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_HERE_API_KEY": "uYU2vTpGJ9NGqqop38f6bldw6cB_9VI51gxdAJhPJfc"
+      }
     }
   },
   "submit": {
