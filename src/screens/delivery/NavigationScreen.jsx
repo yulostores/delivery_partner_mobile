@@ -32,6 +32,13 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
   const address = isPickup ? order.restaurantAddress : order.customerAddress;
   const etaMin = isPickup ? order.pickupEtaMin : order.customerEtaMin;
   const km = isPickup ? order.pickupKm : order.dropKm;
+  // The flat number and the landmark, called out rather than left mid-line in the address
+  // string — they are what actually gets a rider to a door, and the address above is one
+  // comma-joined line they have to read through while holding a bag. Only on the drop leg;
+  // a restaurant has no flat number. Null on orders placed before addresses were stored in
+  // parts, in which case `address` above still contains them.
+  const houseNumber = isPickup ? null : order.customerHouseNumber;
+  const landmark = isPickup ? null : order.customerLandmark;
 
   async function handleArrive() {
     if (busy) return;
@@ -66,7 +73,13 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
         <View className="w-full flex-row items-start justify-between gap-3">
           <View className="flex-1 gap-1">
             <Text className="font-jakarta-bold text-lg text-foreground">{name}</Text>
+            {houseNumber ? (
+              <Text className="font-jakarta-bold text-base text-foreground">{houseNumber}</Text>
+            ) : null}
             <Text className="text-sm text-muted-foreground">{address}</Text>
+            {landmark ? (
+              <Text className="text-sm text-muted-foreground">Landmark: {landmark}</Text>
+            ) : null}
           </View>
           <View className="size-12 items-center justify-center rounded-full border-[1.5px] border-border">
             <PhoneCall size={20} color="#1a1a1a" />

@@ -7,7 +7,12 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -16,7 +21,14 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.vescaviateam.yulostores"
+      "package": "com.vescaviateam.yulostores",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -28,7 +40,10 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Yulo Delivery Partner uses your location to match you with nearby orders and share your position with the customer during a delivery."
+          "locationWhenInUsePermission": "Yulo Delivery Partner uses your location to match you with nearby orders and share your position with the customer during a delivery.",
+          "locationAlwaysAndWhenInUsePermission": "Yulo Delivery Partner shares your location with the customer while you are online, so they can watch their order arrive. Location is only collected while you are on duty and stops the moment you go offline.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [
