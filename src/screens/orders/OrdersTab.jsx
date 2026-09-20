@@ -27,7 +27,13 @@ export default function OrdersTab() {
           if (kind === "offer") {
             navigation.navigate("OrdersIncoming", order);
           } else if (kind === "assigned") {
-            navigation.navigate("DeliveryPickup", { order });
+            // A partner who reopens the app after already picking up must land on the
+            // customer-facing leg, not back on pickup (order.assignmentStatus distinguishes
+            // the two — see yulo_backend's buildOfferPayload).
+            navigation.navigate(
+              order.assignmentStatus === "picked_up" ? "DeliveryNavigate" : "DeliveryPickup",
+              { order },
+            );
           } else {
             setStatus("empty");
           }

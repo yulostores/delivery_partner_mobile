@@ -5,6 +5,7 @@ import { PhoneCall } from "lucide-react-native";
 
 import Button from "@/components/ui/Button";
 import Text from "@/components/ui/Text";
+import DeliveryMap from "@/components/delivery/DeliveryMap";
 
 // Shared by "Go to Pickup" and "Navigate to Customer" — same layout in the
 // Figma design (map header + destination sheet with ETA/call/CTA), differing
@@ -12,6 +13,13 @@ import Text from "@/components/ui/Text";
 // fields off the order; `onArrive` decides where the CTA routes to (and, since
 // Step 6, may itself call a real API — e.g. NavigateToCustomer.jsx's prepaid-delivery
 // call — so it's awaited here with its own busy/error state).
+//
+// The map (DeliveryMap, platform-split — see its .native/.web files) replaces
+// what used to be a hardcoded pair of circles at a fixed pixel position (never
+// actually reflected any real coordinate). It's fed order.restaurantLocation/
+// dropoffLocation — raw [lng, lat] pairs added to the backend's
+// buildOfferPayload specifically for this (yulo_backend's
+// deliveryAssignment.service.js).
 export default function NavigationScreen({ stage, mapLabel, onArrive }) {
   const navigation = useNavigation();
   const { params } = useRoute();
@@ -39,6 +47,7 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
   // parts, in which case `address` above still contains them.
   const houseNumber = isPickup ? null : order.customerHouseNumber;
   const landmark = isPickup ? null : order.customerLandmark;
+  const destination = isPickup ? order.restaurantLocation : order.dropoffLocation;
 
   async function handleArrive() {
     if (busy) return;
@@ -58,15 +67,11 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
       <View className="h-11 w-full bg-background" />
 
       <View
-        className="h-[380px] w-full overflow-hidden bg-[#e8f2e8] px-4 pt-3"
+        className="h-[380px] w-full overflow-hidden bg-[#e8f2e8]"
         accessible
         accessibilityLabel={`${mapLabel} · ${km != null ? `${km} km` : "distance unknown"}`}
       >
-        <View className="absolute h-52 w-4 items-center" style={{ left: 189, top: 60 }}>
-          <View className="size-4 rounded-full bg-primary" />
-          <View className="w-1 flex-1 bg-primary" />
-          <View className="size-4 rounded-full bg-success" />
-        </View>
+        <DeliveryMap destination={destination} />
       </View>
 
       <View className="w-full flex-1 gap-4 rounded-[20px] bg-card px-6 pb-6 pt-4 shadow-md shadow-black/10">
