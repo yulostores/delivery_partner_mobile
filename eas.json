@@ -8,6 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "EXPO_PUBLIC_API_BASE": "https://yulo-backend-f4juo.ondigitalocean.app",
         "EXPO_PUBLIC_HERE_API_KEY": "uYU2vTpGJ9NGqqop38f6bldw6cB_9VI51gxdAJhPJfc"
       }
     },
