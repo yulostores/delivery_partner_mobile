@@ -9,6 +9,16 @@ import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import BottomNav from "@/components/partner/BottomNav";
 import client from "@/api/client";
+import { formatCurrency } from "@/lib/format";
+
+// The trip's earning: the server's own total (GET …/summary — base + distance pay + surge +
+// tip − penalty). An older backend without `total` falls back to the same sum of its parts.
+const part = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
+const tripEarningOf = (p) => {
+  if (!p) return null;
+  if (Number.isFinite(Number(p.total))) return Number(p.total);
+  return Math.round((part(p.basePay) + part(p.distancePay) + part(p.surge) + part(p.tip) - part(p.penalty)) * 100) / 100;
+};
 
 export default function PaymentReceived() {
   const navigation = useNavigation();
@@ -39,21 +49,20 @@ export default function PaymentReceived() {
   if (!order) return null;
 
   const payout = summary?.payout;
-  const tripEarning = payout
-    ? payout.basePay + payout.distancePay + payout.surge + payout.tip - payout.penalty
-    : null;
+  const tripEarning = tripEarningOf(payout);
+  const codAmount = order.codAmount != null ? formatCurrency(order.codAmount) : "—";
   const cashInHand = cashInHandData?.cashInHand;
 
   const rows = [
-    { label: "Order amount", value: `₹${order.codAmount.toFixed(2)}` },
+    { label: "Order amount", value: codAmount },
     { label: "Paid via", value: "Cash" },
     { label: "Change returned", value: "—" },
     {
       label: "Your trip earning",
-      value: tripEarning != null ? `₹${tripEarning.toFixed(2)}` : summaryError ? "Unavailable" : "…",
+      value: tripEarning != null ? formatCurrency(tripEarning) : summaryError ? "Unavailable" : "…",
       accent: true,
     },
-    { label: "Deposit due", value: `₹${order.codAmount.toFixed(2)}` },
+    { label: "Deposit due", value: codAmount },
   ];
 
   return (
@@ -65,7 +74,7 @@ export default function PaymentReceived() {
         <View className="items-center gap-0.5">
           <Text className="font-jakarta-bold text-2xl text-white">Payment received</Text>
           <Text className="text-sm text-white">
-            ₹{order.codAmount.toFixed(2)} collected · {order.restaurantName}
+            {codAmount} collected · {order.restaurantName}
           </Text>
         </View>
       </View>

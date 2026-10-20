@@ -7,6 +7,8 @@ import Button from "@/components/ui/Button";
 import Text from "@/components/ui/Text";
 import BottomNav from "@/components/partner/BottomNav";
 import client from "@/api/client";
+import { formatCurrency } from "@/lib/format";
+import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
 
 const MAP_BG = { veg: "#0d1a0d", standard: "#0d0d1f" };
 
@@ -84,6 +86,10 @@ export default function IncomingOrder() {
       if (err.code === "OFFER_EXPIRED" || err.code === "NOT_YOUR_OFFER") {
         skippedRef.current = true;
         navigation.navigate("HomeOffline");
+      } else if (isOrderGone(err)) {
+        // Cancelled (or reassigned) while the offer was on screen.
+        skippedRef.current = true;
+        leaveGoneOrder(err.code);
       } else {
         setError(err.message);
         setAccepting(false);
@@ -150,10 +156,17 @@ export default function IncomingOrder() {
           <MetricCell label="Total" value={formatKm(order.totalKm)} />
         </View>
 
+        {/* fare is the server's figure for this delivery — base + distance pay + the customer's
+            tip, the same breakdown frozen onto the order on Accept. codAmount is everything the
+            customer owes (food, fees, GST and tip). */}
         <View className="h-[52px] w-full flex-row items-center gap-2 rounded-[20px] bg-primary-tint px-4">
-          <Text className="font-jakarta-bold text-xl text-primary">₹{order.fare.toFixed(2)}</Text>
+          <Text className="font-jakarta-bold text-xl text-primary">
+            {order.fare != null ? formatCurrency(order.fare) : "—"}
+          </Text>
           <Text className="flex-1 font-jakarta-medium text-xs text-muted-foreground">
-            {order.payment === "cod" ? `COD — collect ₹${order.codAmount}` : "Prepaid"}
+            {order.payment === "cod"
+              ? `COD — collect ${order.codAmount != null ? formatCurrency(order.codAmount) : "the order total"}`
+              : "Prepaid"}
           </Text>
         </View>
 

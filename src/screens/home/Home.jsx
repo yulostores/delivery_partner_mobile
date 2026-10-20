@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, View } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 
 import Button from "@/components/ui/Button";
@@ -11,6 +11,7 @@ import { formatClock } from "@/lib/format";
 import client from "@/api/client";
 import { connectPartnerSocket, disconnectPartnerSocket } from "@/lib/partnerSocket";
 import { startLocationPings, stopLocationPings } from "@/lib/locationPings";
+import { usePartnerConfig } from "@/lib/partnerConfig";
 
 // The bonus/incentive-target card below (🎯 "N more orders before 3 PM → ₹X bonus") has no
 // backend concept behind it anywhere in this codebase — no incentive-program endpoint, no target
@@ -47,6 +48,14 @@ function DemandHeatmap() {
 
 export default function Home() {
   const navigation = useNavigation();
+  const { params } = useRoute();
+  const { codEnabled } = usePartnerConfig();
+  // Why the rider was sent back here — e.g. "Order cancelled — no need to deliver"
+  // (lib/orderGone.js). Re-shown for each new noticeAt; dismissed by tapping it.
+  const [notice, setNotice] = useState(null);
+  useEffect(() => {
+    if (params?.notice) setNotice(params.notice);
+  }, [params?.notice, params?.noticeAt]);
 
   // null = not hydrated yet from the backend's real duty status; deliberately not defaulting to
   // false/offline, since a partner who force-quit the app while online should reopen it and see
@@ -190,10 +199,11 @@ export default function Home() {
     queryFn: () => client.get("/partner/earnings?period=today"),
     enabled: online,
   });
+  // Cash in hand only exists for cash-on-delivery orders — not fetched or shown while COD is off.
   const { data: cashInHandData } = useQuery({
     queryKey: ["partner", "earnings", "cash-in-hand"],
     queryFn: () => client.get("/partner/earnings/cash-in-hand"),
-    enabled: online,
+    enabled: online && codEnabled,
   });
   const fleetType = profileData?.partner?.fleetType;
   const fleetLabel = fleetType === "veg" ? "Veg-Only Fleet" : "Standard Fleet";
@@ -229,6 +239,15 @@ export default function Home() {
       )}
 
       <View className="w-full flex-1 gap-4 px-6 pt-5">
+        {notice && (
+          <Pressable
+            onPress={() => setNotice(null)}
+            className="w-full rounded-[20px] border border-destructive bg-destructive/10 px-4 py-3"
+          >
+            <Text className="font-jakarta-semibold text-sm text-destructive">{notice}</Text>
+            <Text className="text-xs text-muted-foreground">Tap to dismiss</Text>
+          </Pressable>
+        )}
         {online && (
           <View className="h-10 w-full flex-row items-center gap-2 rounded-full bg-success-tint px-4">
             <View className="size-2.5 rounded-full bg-success" />
@@ -258,7 +277,9 @@ export default function Home() {
           )}
           <Text className="text-xs text-muted-foreground">
             {online
-              ? `${earningsData?.orders ?? 0} orders  ·  Cash in hand: ₹${cashInHandData?.cashInHand ?? 0}`
+              ? `${earningsData?.orders ?? 0} orders${
+                  codEnabled ? `  ·  Cash in hand: ₹${cashInHandData?.cashInHand ?? 0}` : ""
+                }`
               : "0 orders"}
           </Text>
         </View>

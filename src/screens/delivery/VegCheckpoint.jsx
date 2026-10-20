@@ -10,6 +10,7 @@ import AppBar from "@/components/partner/AppBar";
 import OtpInput from "@/components/partner/OtpInput";
 import { cn } from "@/lib/utils";
 import client from "@/api/client";
+import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
 
 // Matches server/controllers/partner/order.controller.js's packagingChecklist fields exactly
 // (sealIntact, tempBagUsed). The old second item, "No other order in bag", didn't correspond to
@@ -67,7 +68,9 @@ export default function VegCheckpoint() {
       });
       navigation.navigate("DeliveryNavigate", { order });
     } catch (err) {
-      if (err.code === "INVALID_OTP") {
+      if (isOrderGone(err)) {
+        leaveGoneOrder(err.code);
+      } else if (err.code === "INVALID_OTP") {
         setError("Incorrect pickup OTP — check the code and try again.");
       } else if (err.code === "CHECKLIST_INCOMPLETE") {
         setError("Complete the veg packaging checklist before confirming pickup.");

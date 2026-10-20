@@ -8,6 +8,25 @@ import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import AppBar from "@/components/partner/AppBar";
 import client from "@/api/client";
+import { formatCurrency } from "@/lib/format";
+import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
+
+// The server's limit on a reported collection (deliverSchema in
+// server/controllers/partner/order.controller.js): at most ₹1,00,000, to the paisa.
+const MAX_COD_COLLECTED = 100000;
+
+// The amount to report, or why it can't be. Rounded to the paisa (the server rejects more
+// decimals) and never above the server's cap.
+function codCollectedFor(codAmount) {
+  const amount = Math.round(Number(codAmount) * 100) / 100;
+  if (codAmount == null || !Number.isFinite(amount) || amount < 0) {
+    return { error: "This order has no cash amount to collect — contact support." };
+  }
+  if (amount > MAX_COD_COLLECTED) {
+    return { error: "This order is above the ₹1,00,000 cash limit — contact support before delivering." };
+  }
+  return { amount };
+}
 
 export default function CodCollection() {
   const navigation = useNavigation();
@@ -26,6 +45,11 @@ export default function CodCollection() {
 
   async function handleConfirmDelivery() {
     if (!cashReceived || submitting) return;
+    const { amount, error: amountError } = codCollectedFor(order.codAmount);
+    if (amountError) {
+      setError(amountError);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -33,7 +57,7 @@ export default function CodCollection() {
       // deliberately doesn't hard-validate the collected amount against order.codAmount (see
       // deliverOrder's codDiscrepancy comment), so this always reports the known order amount
       // rather than a separately-typed figure the partner could get wrong by typo.
-      await client.post(`/partner/orders/${order.orderId}/deliver`, { codCollected: order.codAmount });
+      await client.post(`/partner/orders/${order.orderId}/deliver`, { codCollected: amount });
       // Home.jsx's earnings/cash-in-hand queries fetch once (before this delivery even happened)
       // and sit on a 60s staleTime — without this, Earnings.jsx and PaymentReceived.jsx (which
       // share those exact query keys) would keep painting that stale pre-delivery snapshot instead
@@ -41,7 +65,8 @@ export default function CodCollection() {
       queryClient.invalidateQueries({ queryKey: ["partner", "earnings"] });
       navigation.navigate("DeliveryPaymentReceived", { order });
     } catch (err) {
-      setError(err.message);
+      if (isOrderGone(err)) leaveGoneOrder(err.code);
+      else setError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -57,7 +82,7 @@ export default function CodCollection() {
             Amount to collect (COD)
           </Text>
           <Text className="font-jakarta-bold text-[36px] leading-[45px] text-foreground">
-            ₹{order.codAmount.toFixed(2)}
+            {order.codAmount != null ? formatCurrency(order.codAmount) : "—"}
           </Text>
         </View>
 

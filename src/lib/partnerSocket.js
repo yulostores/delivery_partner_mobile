@@ -2,6 +2,7 @@ import { io } from "socket.io-client";
 import { API_BASE } from "@/api/config";
 import { getAccessToken } from "@/api/client";
 import { navigate } from "@/navigation/navigationRef";
+import { handleOrderCancelledPush } from "@/lib/orderGone";
 
 // Connects to the bare server origin, not `${API_BASE}/api` — Socket.IO attaches directly to the
 // HTTP server (server/socket.js's initSocket(httpServer)) on its own default path, independent of
@@ -44,6 +45,10 @@ export function connectPartnerSocket() {
   _socket.on("order_offer", (payload) => {
     navigate("OrdersIncoming", payload);
   });
+
+  // The order on screen was cancelled (by the customer, restaurant or Yulo) — drop it and go back
+  // to Home with a notice; picking it up or delivering it would be refused anyway.
+  _socket.on("order_cancelled", handleOrderCancelledPush);
 
   return _socket;
 }

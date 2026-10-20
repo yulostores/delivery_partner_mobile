@@ -6,6 +6,7 @@ import { PhoneCall } from "lucide-react-native";
 import Button from "@/components/ui/Button";
 import Text from "@/components/ui/Text";
 import DeliveryMap from "@/components/delivery/DeliveryMap";
+import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
 
 // Shared by "Go to Pickup" and "Navigate to Customer" — same layout in the
 // Figma design (map header + destination sheet with ETA/call/CTA), differing
@@ -56,7 +57,9 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
     try {
       await onArrive(navigation, order);
     } catch (err) {
-      setError(err.message);
+      // Cancelled or reassigned on the way: the delivery call is refused — leave the flow.
+      if (isOrderGone(err)) leaveGoneOrder(err.code);
+      else setError(err.message);
     } finally {
       setBusy(false);
     }

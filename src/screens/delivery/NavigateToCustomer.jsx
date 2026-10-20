@@ -5,7 +5,9 @@ import client from "@/api/client";
 
 async function handleArrive(queryClient, navigation, order) {
   // COD orders need cash collected before the trip can close; CodCollection.jsx's own "Confirm
-  // delivery" button is what actually calls POST .../deliver for that path.
+  // delivery" button is what actually calls POST .../deliver for that path. Decided by the order,
+  // not by the COD switch: while COD is off no new order is cash-on-delivery, but one placed
+  // before it was switched off still has cash to collect.
   if (order.payment === "cod") {
     navigation.navigate("DeliveryCodCollection", { order });
     return;

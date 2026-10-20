@@ -9,3 +9,9 @@ export function navigate(name, params) {
     navigationRef.navigate(name, params);
   }
 }
+
+// The focused route ({ name, params }) or null — for socket handlers deciding whether a push is
+// about what the rider is looking at right now.
+export function getCurrentRoute() {
+  return navigationRef.isReady() ? navigationRef.getCurrentRoute() : null;
+}
