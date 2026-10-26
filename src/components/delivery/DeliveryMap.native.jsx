@@ -29,11 +29,17 @@ export default function DeliveryMap({ destination }) {
       // prompts a second time.
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== "granted" || cancelled) return;
-      subscription = await Location.watchPositionAsync(
+      const watcher = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.Balanced, timeInterval: 4000, distanceInterval: 10 },
-        ({ coords }) => setMyLocation([coords.longitude, coords.latitude]),
+        ({ coords }) => {
+          if (!cancelled) setMyLocation([coords.longitude, coords.latitude]);
+        },
       );
-    })();
+      // Left the screen while the watch was starting: stop it now, or it runs on (GPS on,
+      // updating a map that no longer exists) until the app is killed.
+      if (cancelled) watcher.remove();
+      else subscription = watcher;
+    })().catch(() => {});
 
     return () => {
       cancelled = true;

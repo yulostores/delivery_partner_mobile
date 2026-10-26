@@ -91,7 +91,12 @@ export default function RootNavigator() {
       initialRouteName={isAuthenticated ? "HomeOffline" : "Onboarding"}
     >
       <Stack.Screen name="Onboarding" component={OnboardingStack} />
-      <Stack.Screen name="HomeOffline" component={Home} />
+      {/* One Home, ever. React Navigation 7's navigate() pushes a new screen rather than going
+          back to an existing one, so every "Done" / "Back to home" stacked another Home on top
+          of the finished delivery's screens — each still mounted, each Home re-checking duty
+          status on every return to the app. With a fixed id, navigate() brings the existing Home
+          back; Home then clears whatever was left underneath it (see Home.jsx). */}
+      <Stack.Screen name="HomeOffline" component={Home} getId={() => "home"} />
       <Stack.Screen
         name="FleetBadgeInfo"
         component={FleetBadgeInfo}
@@ -100,7 +105,18 @@ export default function RootNavigator() {
       <Stack.Screen name="OrdersTab" component={OrdersTab} />
       {/* A single route now — fleetType comes from the real order_offer payload (see
           partnerSocket.js), not from which of two routes got registered. */}
-      <Stack.Screen name="OrdersIncoming" component={IncomingOrder} />
+      {/* One screen per OFFER (order id + when that offer lapses): a new offer — including the
+          same order offered again after a cooldown — opens fresh with its own countdown, instead
+          of reviving an earlier screen whose countdown already ran out and which no longer
+          accepts taps. The same offer opened again (resume, notification tap) returns to its
+          existing screen. */}
+      <Stack.Screen
+        name="OrdersIncoming"
+        component={IncomingOrder}
+        getId={({ params }) =>
+          params?.orderId ? `${params.orderId}:${params.offerExpiresAt ?? ""}` : undefined
+        }
+      />
       <Stack.Screen
         name="OrdersReject"
         component={RejectReasonSheet}

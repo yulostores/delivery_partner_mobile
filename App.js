@@ -18,6 +18,11 @@ import { PartnerAuthProvider } from "@/context/PartnerAuthContext";
 import RootNavigator from "@/navigation/RootNavigator";
 import { linking } from "@/navigation/linking";
 import { navigationRef } from "@/navigation/navigationRef";
+import AppErrorBoundary from "@/components/AppErrorBoundary";
+import { configureNotifications } from "@/lib/pushNotifications";
+
+// Notification channels, the foreground handler and the tap listener — before anything can arrive.
+configureNotifications();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,9 +48,11 @@ export default function App() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <PartnerAuthProvider>
-            <NavigationContainer ref={navigationRef} linking={linking}>
-              <RootNavigator />
-            </NavigationContainer>
+            <AppErrorBoundary>
+              <NavigationContainer ref={navigationRef} linking={linking}>
+                <RootNavigator />
+              </NavigationContainer>
+            </AppErrorBoundary>
           </PartnerAuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

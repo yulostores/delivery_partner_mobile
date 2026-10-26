@@ -4,12 +4,59 @@ import { getRefreshToken, clearRefreshToken } from "./tokenStorage";
 
 // Access token lives in memory only.
 let _accessToken = null;
+// When it was handed to us — partner access tokens last 15 minutes (server JWT_PARTNER_ACCESS_EXPIRES),
+// so anything that must not present an expired one (the socket join) can tell when to refresh.
+let _accessTokenAt = 0;
+// Bumped whenever the session ends (token cleared). A refresh started before that — by a location
+// ping or the socket — must not put the signed-out rider's token back when it lands afterwards.
+let _sessionGeneration = 0;
 
 export function setAccessToken(token) {
+  if (!token) _sessionGeneration += 1;
   _accessToken = token;
+  _accessTokenAt = token ? Date.now() : 0;
 }
 export function getAccessToken() {
   return _accessToken;
+}
+
+// One refresh at a time, however many callers ask at once.
+let _refreshPromise = null;
+
+/**
+ * Mints a new access token from the stored refresh token. Resolves the token, or null when there
+ * is no session to refresh (signed out, or the refresh token was revoked/expired).
+ */
+export function refreshAccessToken() {
+  if (!_refreshPromise) {
+    const generation = _sessionGeneration;
+    _refreshPromise = (async () => {
+      try {
+        const refreshToken = await getRefreshToken();
+        if (!refreshToken) return null;
+        const { data } = await axios.post(`${API_BASE}/api/partner/auth/refresh`, { refreshToken });
+        if (generation !== _sessionGeneration) return null; // signed out while this was in flight
+        setAccessToken(data.data.accessToken);
+        return data.data.accessToken;
+      } catch (err) {
+        // Only a refused refresh means the session is over; a network blip keeps it.
+        if (err?.response?.status === 401 || err?.response?.status === 400) return null;
+        throw err;
+      } finally {
+        _refreshPromise = null;
+      }
+    })();
+  }
+  return _refreshPromise;
+}
+
+// Refresh this long before the 15-minute expiry, so a token is never presented in its last minutes.
+const FRESH_FOR_MS = 10 * 60 * 1000;
+
+/** An access token that will still be valid for a while — refreshed first if it is getting old. */
+export async function getFreshAccessToken() {
+  if (_accessToken && Date.now() - _accessTokenAt < FRESH_FOR_MS) return _accessToken;
+  return refreshAccessToken();
 }
 
 // Single Axios instance for all API calls. Unlike the browser admin client,
@@ -27,8 +74,14 @@ const client = axios.create({
   baseURL: `${API_BASE}/api`,
 });
 
-client.interceptors.request.use((config) => {
-  const token = getAccessToken();
+client.interceptors.request.use(async (config) => {
+  let token = getAccessToken();
+  // No token in memory but a session on the phone (app opened offline, or a fresh JS context):
+  // mint one first. Sent with no token at all, the request would fail with an error the
+  // refresh-on-401 below doesn't retry. Sign-in calls themselves never need one.
+  if (!token && !config.url?.startsWith("/partner/auth/")) {
+    token = await refreshAccessToken().catch(() => null);
+  }
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -50,9 +103,6 @@ client.interceptors.request.use((config) => {
 // and INVALID_TOKEN too (harmless if it turns out not to be refreshable — the refresh
 // call itself will then fail and this correctly falls through to session-expired
 // below, at the cost of one extra round trip).
-let _refreshing = false;
-let _queue = [];
-
 const REFRESHABLE_CODES = new Set(["TOKEN_EXPIRED", "INVALID_TOKEN"]);
 
 client.interceptors.response.use(
@@ -64,34 +114,24 @@ client.interceptors.response.use(
     if (err.response?.status === 401 && REFRESHABLE_CODES.has(code) && original && !original._retried) {
       original._retried = true;
 
-      if (_refreshing) {
-        return new Promise((resolve, reject) => _queue.push({ resolve, reject })).then((token) => {
-          original.headers.Authorization = `Bearer ${token}`;
-          return client(original);
-        });
-      }
-
-      _refreshing = true;
+      // refreshAccessToken() shares one in-flight refresh between every caller (this
+      // interceptor, the socket join, background location pings).
+      let newToken;
       try {
-        const refreshToken = await getRefreshToken();
-        if (!refreshToken) throw err; // nothing to refresh with — fall through to session-expired
-
-        const { data } = await axios.post(`${API_BASE}/api/partner/auth/refresh`, { refreshToken });
-        const newToken = data.data.accessToken;
-        setAccessToken(newToken);
-        _queue.forEach(({ resolve }) => resolve(newToken));
-        _queue = [];
+        newToken = await refreshAccessToken();
+      } catch (refreshErr) {
+        // Network failure while refreshing: the session is still good — fail just this request.
+        // (Clearing the session here used to sign a rider out on one dropped connection.)
+        return Promise.reject(refreshErr);
+      }
+      if (newToken) {
         original.headers.Authorization = `Bearer ${newToken}`;
         return client(original);
-      } catch (refreshErr) {
-        setAccessToken(null);
-        await clearRefreshToken();
-        _queue.forEach(({ reject }) => reject(refreshErr));
-        _queue = [];
-        return Promise.reject(refreshErr);
-      } finally {
-        _refreshing = false;
       }
+      // The server refused the refresh token: the session really is over. Falls through to
+      // report this request's 401 like any other error.
+      setAccessToken(null);
+      await clearRefreshToken();
     }
 
     if (!err.response) {

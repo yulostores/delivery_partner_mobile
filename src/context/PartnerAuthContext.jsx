@@ -2,10 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQueryClient } from "@tanstack/react-query";
 
-import client, { setAccessToken } from "@/api/client";
-import { getRefreshToken, setRefreshToken, clearRefreshToken } from "@/api/tokenStorage";
+import client, { refreshAccessToken, setAccessToken } from "@/api/client";
+import { setRefreshToken, clearRefreshToken } from "@/api/tokenStorage";
 import { disconnectPartnerSocket } from "@/lib/partnerSocket";
 import { stopLocationPings } from "@/lib/locationPings";
+import { unregisterPushToken } from "@/lib/pushNotifications";
 
 const PROFILE_KEY = "yulo_partner_profile";
 
@@ -32,14 +33,20 @@ export function PartnerAuthProvider({ children }) {
         // proactively refreshing here — otherwise the user appears "logged in" (profile present)
         // but the very first real request has to go through Step 1's 401-retry path before
         // anything actually works.
+        let accessToken;
         try {
-          const refreshToken = await getRefreshToken();
-          if (!refreshToken) throw new Error("No stored refresh token");
-          const { accessToken } = await client.post("/partner/auth/refresh", { refreshToken });
-          setAccessToken(accessToken);
-          setUser(cachedProfile);
+          accessToken = await refreshAccessToken();
         } catch {
-          // Refresh token missing/expired/invalid — the cached profile isn't usable without a
+          // Offline at launch: the session is still good. Keep the rider signed in — the first
+          // request that needs a token refreshes it once the connection is back. (Signing out
+          // here logged riders out whenever they opened the app without signal.)
+          setUser(cachedProfile);
+          return;
+        }
+        if (accessToken) {
+          setUser(cachedProfile);
+        } else {
+          // Refresh token missing/expired/revoked — the cached profile isn't usable without a
           // live session. Drop it rather than leave the app in a half-authenticated state.
           await AsyncStorage.removeItem(PROFILE_KEY);
           await clearRefreshToken();
@@ -91,6 +98,8 @@ export function PartnerAuthProvider({ children }) {
   );
 
   const logout = useCallback(async () => {
+    // While still signed in — the server needs the session to know whose phone to forget.
+    await unregisterPushToken();
     try {
       await client.post("/partner/auth/logout");
     } catch {

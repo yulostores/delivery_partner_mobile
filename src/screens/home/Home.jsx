@@ -11,6 +11,8 @@ import { formatClock } from "@/lib/format";
 import client from "@/api/client";
 import { connectPartnerSocket, disconnectPartnerSocket } from "@/lib/partnerSocket";
 import { startLocationPings, stopLocationPings } from "@/lib/locationPings";
+import { registerPushToken } from "@/lib/pushNotifications";
+import { resumeCurrentOrder } from "@/lib/currentOrder";
 import { usePartnerConfig } from "@/lib/partnerConfig";
 
 // The bonus/incentive-target card below (🎯 "N more orders before 3 PM → ₹X bonus") has no
@@ -66,12 +68,6 @@ export default function Home() {
   const [toggleError, setToggleError] = useState(null);
   const [dutySeconds, setDutySeconds] = useState(0);
   const intervalRef = useRef(null);
-  const isOnlineRef = useRef(false);
-
-  useEffect(() => {
-    isOnlineRef.current = isOnline === true;
-  }, [isOnline]);
-
   const startClock = useCallback(() => {
     clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => setDutySeconds((s) => s + 1), 1000);
@@ -83,29 +79,10 @@ export default function Home() {
     setDutySeconds(0);
   }, []);
 
-  // Resumes into whatever's actually in flight per the backend — an offer still waiting on an
-  // answer, or an order already accepted — rather than stranding the partner on Home after the
-  // app was backgrounded mid-offer or mid-delivery. Best-effort: a failure here just leaves the
-  // partner on Home, which is always a safe fallback.
-  const checkCurrentOrder = useCallback(async () => {
-    try {
-      const { kind, order } = await client.get("/partner/orders/current");
-      if (kind === "offer") {
-        navigation.navigate("OrdersIncoming", order);
-      } else if (kind === "assigned") {
-        // A partner who reopens the app after already picking up must land on the
-        // customer-facing leg, not back on pickup (order.assignmentStatus distinguishes
-        // the two — see yulo_backend's buildOfferPayload).
-        navigation.navigate(
-          order.assignmentStatus === "picked_up" ? "DeliveryNavigate" : "DeliveryPickup",
-          { order },
-        );
-      }
-    } catch {
-      // best-effort — see comment above
-    }
-  }, [navigation]);
-
+  // The backend's duty status is the truth; this screen mirrors it. Read on mount AND on every
+  // return to the foreground — reading it only on mount left the switch showing whatever it
+  // showed before the app was backgrounded (or killed and relaunched), which looked like the app
+  // going online and offline by itself.
   const fetchDutyStatus = useCallback(async () => {
     setHydrateError(false);
     try {
@@ -119,35 +96,58 @@ export default function Home() {
         // completely unreachable if the app was killed and relaunched. Reconnect here so a
         // partner who force-quit while online is actually rejoined, not just shown as online.
         connectPartnerSocket();
-        checkCurrentOrder();
+        resumeCurrentOrder();
+        // Checks only — never prompts here (see locationPings.js start()).
         startLocationPings();
+        registerPushToken();
+      } else {
+        stopClock();
+        disconnectPartnerSocket();
+        stopLocationPings();
       }
     } catch {
+      // Couldn't reach the server: keep showing what we last knew rather than flipping to
+      // "offline" — the rider hasn't changed anything, and the backend still has them on duty.
       setHydrateError(true);
-      setIsOnline(false);
     }
-  }, [startClock, checkCurrentOrder]);
+  }, [startClock, stopClock]);
 
   useEffect(() => {
     fetchDutyStatus();
     return () => clearInterval(intervalRef.current);
   }, [fetchDutyStatus]);
 
-  // App backgrounding doesn't unmount this screen (no fresh mount-effect fires), so a socket
-  // dropped by the OS while suspended needs an explicit nudge on return to foreground rather
-  // than waiting on socket.io's own reconnect/ping-timeout detection. Same reasoning applies to
-  // resuming into a live offer/delivery — the socket push that would've delivered a fresh offer
-  // couldn't reach a suspended app either.
+  // Home is the root: arriving here (after a delivery, a skipped offer, a cancellation notice…)
+  // drops every screen left underneath, so finished flows don't stay mounted and Back from Home
+  // leaves the app instead of walking back through an old delivery. Waits for the transition so
+  // the screens aren't pulled out mid-animation. The route keeps its key, so Home isn't remounted.
+  useEffect(() => {
+    let timer = null;
+    const unsubscribe = navigation.addListener("focus", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const state = navigation.getState();
+        if (!state || state.routes.length <= 1) return;
+        const self = state.routes[state.index];
+        if (self?.name !== "HomeOffline") return;
+        navigation.reset({ index: 0, routes: [self] });
+      }, 400);
+    });
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [navigation]);
+
+  // App backgrounding doesn't unmount this screen (no fresh mount-effect fires), so on return to
+  // the foreground: re-read the duty status, and if on duty rejoin the socket the OS may have
+  // dropped and open any offer that arrived meanwhile (fetchDutyStatus does all of that).
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active" && isOnlineRef.current) {
-        connectPartnerSocket();
-        checkCurrentOrder();
-        startLocationPings();
-      }
+      if (nextState === "active") fetchDutyStatus();
     });
     return () => subscription.remove();
-  }, [checkCurrentOrder]);
+  }, [fetchDutyStatus]);
 
   async function handleToggleOnline() {
     if (isOnline === null || toggling) return;
@@ -160,7 +160,10 @@ export default function Home() {
       if (nextOnline) {
         startClock();
         connectPartnerSocket();
-        startLocationPings();
+        // The rider just tapped "Go online": the one moment to ask for location and
+        // notification permission.
+        // One after the other: Android shows one permission prompt at a time.
+        startLocationPings({ ask: true }).finally(() => registerPushToken({ ask: true }));
       } else {
         stopClock();
         disconnectPartnerSocket();
@@ -304,7 +307,9 @@ export default function Home() {
         {hydrateError && (
           <Pressable onPress={fetchDutyStatus}>
             <Text className="text-center text-sm text-destructive">
-              Couldn&rsquo;t load duty status — tap to retry
+              {isOnline === null
+              ? "Couldn\u2019t load duty status — tap to retry"
+              : "Couldn\u2019t refresh duty status — tap to retry"}
             </Text>
           </Pressable>
         )}
@@ -318,7 +323,7 @@ export default function Home() {
           disabled={isOnline === null || toggling}
           onPress={handleToggleOnline}
         >
-          {toggling ? "Updating…" : online ? "Go offline" : "Go online"}
+          {isOnline === null ? "Checking status…" : toggling ? "Updating…" : online ? "Go offline" : "Go online"}
         </Button>
       </View>
 

@@ -1,10 +1,7 @@
-import axios from "axios";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
-import client, { getAccessToken, setAccessToken } from "@/api/client";
-import { API_BASE } from "@/api/config";
-import { getRefreshToken } from "@/api/tokenStorage";
+import client, { getAccessToken, refreshAccessToken } from "@/api/client";
 
 /**
  * Location reporting for an on-duty partner.
@@ -56,19 +53,21 @@ const PING_DISTANCE_M = 50;
 async function ensureAccessToken() {
   if (getAccessToken()) return true;
 
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) return false;
-
+  let token;
   try {
-    const { data } = await axios.post(`${API_BASE}/api/partner/auth/refresh`, { refreshToken });
-    setAccessToken(data.data.accessToken);
-    return true;
+    token = await refreshAccessToken();
   } catch {
+    // Offline for a moment — skip this ping, keep tracking. (Stopping here used to end tracking
+    // for the rest of the shift on one dropped connection.)
+    return false;
+  }
+  if (!token) {
     // Signed out, or the refresh token was revoked. Stop tracking rather than retrying forever
     // in the background against a session that no longer exists.
     await stopLocationPings();
     return false;
   }
+  return true;
 }
 
 async function report(coords) {
@@ -130,26 +129,53 @@ function stopForegroundWatch() {
  * priority in ranking (see the server's deliveryAssignment.service.js rankCandidates) and without
  * appearing on the customer's map.
  */
-export async function startLocationPings() {
+// Calls run one at a time: going online (which asks) and a return to the foreground (which only
+// checks) often overlap, and two concurrent starts could each see "nothing running" and start
+// two watchers — double the GPS use and double the pings.
+let _startChain = Promise.resolve();
+
+// No queued step may hold the queue forever — some phones never return from the "Allow all the
+// time" settings page with an answer, and everything behind it (going offline, signing out) would
+// wait on it. The step itself carries on; the queue just stops waiting for it.
+const STEP_LIMIT_MS = 2 * 60 * 1000;
+const bounded = (fn) => () =>
+  Promise.race([fn(), new Promise((resolve) => setTimeout(resolve, STEP_LIMIT_MS))]);
+
+export function startLocationPings(options) {
+  const run = bounded(() => startOnce(options));
+  _startChain = _startChain.then(run, run);
+  return _startChain;
+}
+
+async function startOnce({ ask = false } = {}) {
   // Every call site fires this without awaiting (the duty toggle, the duty-status hydrate, the
   // foreground-resume listener), so a rejection here would surface as an unhandled promise
   // rejection rather than as anything anyone can act on. Failing to start tracking must degrade
   // to "not tracked", never to a crash on the screen the rider uses to go online.
   try {
-    await start();
+    await start(ask);
   } catch {
     // Left silent for the same reason: this fires on every resume, and a device that refuses
     // background location will refuse it every single time.
   }
 }
 
-async function start() {
-  const foreground = await Location.requestForegroundPermissionsAsync();
+// `ask` shows the permission prompts — only when the rider has just tapped "Go online". Every
+// other caller (launch, return to the foreground) only checks. Asking on return to the
+// foreground was a loop: the prompt (or Android's "Allow all the time" settings page) sends the
+// app to the background, closing it brings the app back, which asked again — the screen and the
+// status bar flickered until Android stopped showing the prompt.
+async function start(ask) {
+  const foreground = ask
+    ? await Location.requestForegroundPermissionsAsync()
+    : await Location.getForegroundPermissionsAsync();
   if (foreground.status !== "granted") return;
 
   // Android requires foreground permission to already be granted before the background prompt is
   // allowed to appear, which is why these are sequential rather than concurrent.
-  const background = await Location.requestBackgroundPermissionsAsync();
+  const background = ask
+    ? await Location.requestBackgroundPermissionsAsync()
+    : await Location.getBackgroundPermissionsAsync();
   if (background.status !== "granted") {
     await startForegroundWatch();
     return;
@@ -190,8 +216,20 @@ async function start() {
  * Stops all location reporting. Safe to call when nothing is running — which matters, because
  * sign-out calls it unconditionally (see context/PartnerAuthContext.jsx).
  */
-export async function stopLocationPings() {
-  stopForegroundWatch();
+export function stopLocationPings() {
+  // Queued behind any start still in progress — otherwise going offline straight after going
+  // online could stop "nothing" and then have the pending start switch tracking on.
+  const run = bounded(stopNow);
+  _startChain = _startChain.then(run, run);
+  return _startChain;
+}
+
+async function stopNow() {
+  try {
+    stopForegroundWatch();
+  } catch {
+    // already gone
+  }
 
   // `unregisterTaskAsync` on a task that was never registered throws, so this has to be asked
   // rather than assumed.
