@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
 import { usePartnerConfig } from "@/lib/partnerConfig";
 import client from "@/api/client";
-import { usePartnerAuth } from "@/context/PartnerAuthContext";
 
 const TABS = [
   { key: "today", label: "Today" },
@@ -30,6 +29,8 @@ const BREAKDOWN_ROWS = (data, isVeg) =>
     Number(data.peakSurge) > 0 && { label: "Peak surge", value: data.peakSurge },
     { label: "Tips", value: data.tips },
     isVeg && { label: "Veg fleet idle-pay", value: data.idlePay },
+    // Part of totalEarned on the server — without its own row the breakdown didn't add up.
+    Number(data.incentiveBonus) > 0 && { label: "Incentives", value: data.incentiveBonus },
     { label: "Penalties", value: -(Number(data.penalties) || 0), isPenalty: true },
   ].filter(Boolean);
 
@@ -74,9 +75,13 @@ function DeliveryLine({ d }) {
 export default function Earnings() {
   const navigation = useNavigation();
   const { params } = useRoute();
-  const { user } = usePartnerAuth();
   const [period, setPeriod] = useState(params?.period ?? "today");
-  const isVeg = user?.fleetType === "veg";
+  // From the live profile, not the sign-in snapshot — an approved fleet change wouldn't show there.
+  const { data: profileData } = useQuery({
+    queryKey: ["partner", "profile"],
+    queryFn: () => client.get("/partner/profile"),
+  });
+  const isVeg = profileData?.partner?.fleetType === "veg";
   const { codEnabled } = usePartnerConfig();
 
   const {
@@ -86,6 +91,9 @@ export default function Earnings() {
   } = useQuery({
     queryKey: ["partner", "earnings", period],
     queryFn: () => client.get(`/partner/earnings?period=${period}`),
+    // Keeps the last period on screen while the next one loads — switching tabs used to blank
+    // the whole screen (bottom bar included) until the request finished.
+    placeholderData: keepPreviousData,
   });
   // Two separate real endpoints on purpose (see cashLedger.service.js's full-ledger design
   // comment) — not derived from `data` above, which only covers the selected period's earnings.

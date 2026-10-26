@@ -7,43 +7,35 @@ import Button from "@/components/ui/Button";
 import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import BottomNav from "@/components/partner/BottomNav";
-import { formatClock } from "@/lib/format";
+import DeliveryMap from "@/components/delivery/DeliveryMap";
 import client from "@/api/client";
 import { connectPartnerSocket, disconnectPartnerSocket } from "@/lib/partnerSocket";
 import { startLocationPings, stopLocationPings } from "@/lib/locationPings";
 import { registerPushToken } from "@/lib/pushNotifications";
 import { resumeCurrentOrder } from "@/lib/currentOrder";
 import { usePartnerConfig } from "@/lib/partnerConfig";
+import { formatClock, formatCurrency } from "@/lib/format";
+import { clearDutyStart, getOrStartDuty } from "@/lib/dutyClock";
 
-// The bonus/incentive-target card below (🎯 "N more orders before 3 PM → ₹X bonus") has no
-// backend concept behind it anywhere in this codebase — no incentive-program endpoint, no target
-// field on DeliveryPartner or Order. Left as static UI rather than either fabricating an API for
-// it or silently dropping working UI; matches how SupportHelp.jsx's call/chat/email rows stay
-// honest no-ops for the same reason (confirmed, no realistic backend to wire to).
-const BONUS_MOCK = { bonusTarget: 3, bonusAmount: 120, bonusProgressPct: 40 };
+// No bonus/incentive card: there is no incentive programme behind it on the backend, and a
+// hardcoded "3 more orders → ₹120 bonus" promised riders money nobody would pay.
+
+const greetingFor = (hour) => (hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening");
 
 // 'busy' (mid-delivery) counts as on-duty for display purposes even though the toggle can't
 // flip it off directly (the backend 409s — see handleToggleOnline).
 const ON_DUTY_STATUSES = new Set(["active", "busy"]);
 
-function DemandHeatmap() {
+// The live map around the rider (HERE tiles, the same component as the pickup/drop-off screens,
+// with no destination pin). The backend has no demand data yet, so no heat overlay is drawn — a
+// made-up one would send riders to areas with no orders.
+function HomeMap() {
   return (
-    <View className="h-[300px] w-full overflow-hidden bg-success-tint px-4 pt-2">
-      <View className="h-7 w-[168px] items-center justify-center rounded-full bg-success-tint">
-        <Text className="font-jakarta-semibold text-xs text-[#17803d]">Veg demand heatmap</Text>
+    <View className="h-[300px] w-full overflow-hidden bg-muted">
+      <DeliveryMap />
+      <View className="absolute left-4 top-2 h-7 items-center justify-center rounded-full bg-card px-3 shadow-md shadow-black/10">
+        <Text className="font-jakarta-semibold text-xs text-foreground">Your location</Text>
       </View>
-      <View
-        className="absolute rounded-full bg-success/20"
-        style={{ left: 15, top: 165, width: 110, height: 110 }}
-      />
-      <View
-        className="absolute rounded-full bg-success/25"
-        style={{ left: 135, top: 175, width: 150, height: 150 }}
-      />
-      <View
-        className="absolute rounded-full bg-success/20"
-        style={{ left: 275, top: 140, width: 90, height: 90 }}
-      />
     </View>
   );
 }
@@ -68,15 +60,22 @@ export default function Home() {
   const [toggleError, setToggleError] = useState(null);
   const [dutySeconds, setDutySeconds] = useState(0);
   const intervalRef = useRef(null);
-  const startClock = useCallback(() => {
+  // Counted from a stored start time rather than by adding a second per tick: JS timers freeze
+  // while the app is in the background, so a tick counter fell behind on every phone lock and
+  // restarted from zero whenever the app was reopened.
+  const startClock = useCallback(async () => {
+    const startedAt = await getOrStartDuty();
+    const tick = () => setDutySeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
     clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(() => setDutySeconds((s) => s + 1), 1000);
+    tick();
+    intervalRef.current = setInterval(tick, 1000);
   }, []);
 
   const stopClock = useCallback(() => {
     clearInterval(intervalRef.current);
     intervalRef.current = null;
     setDutySeconds(0);
+    clearDutyStart();
   }, []);
 
   // The backend's duty status is the truth; this screen mirrors it. Read on mount AND on every
@@ -219,7 +218,7 @@ export default function Home() {
     <Screen edges={["top", "bottom"]}>
       <View className="h-16 w-full flex-row items-center justify-between bg-card pl-6 pr-5">
         <Text className="font-jakarta-semibold text-[16px] text-foreground">
-          Good morning{firstName ? `, ${firstName}` : ""}
+          {greetingFor(new Date().getHours())}{firstName ? `, ${firstName}` : ""}
         </Text>
         {!online && (
           <Pressable
@@ -232,11 +231,11 @@ export default function Home() {
       </View>
 
       {online ? (
-        <DemandHeatmap />
+        <HomeMap />
       ) : (
         <View className="h-[328px] w-full items-center justify-center bg-muted px-6">
           <Text className="text-center text-sm text-muted-foreground">
-            Go online to see demand heatmap
+            Go online to see the map
           </Text>
         </View>
       )}
@@ -271,7 +270,7 @@ export default function Home() {
                 : "font-jakarta-bold text-[36px] leading-[42px] text-muted-foreground"
             }
           >
-            ₹{online && earningsData ? earningsData.totalEarned.toFixed(2) : "0.00"}
+            {formatCurrency(online ? Number(earningsData?.totalEarned) || 0 : 0)}
           </Text>
           {online && earningsError && (
             <Text className="text-xs text-destructive" onPress={() => refetchEarnings()}>
@@ -281,28 +280,11 @@ export default function Home() {
           <Text className="text-xs text-muted-foreground">
             {online
               ? `${earningsData?.orders ?? 0} orders${
-                  codEnabled ? `  ·  Cash in hand: ₹${cashInHandData?.cashInHand ?? 0}` : ""
+                  codEnabled ? `  ·  Cash in hand: ${formatCurrency(Number(cashInHandData?.cashInHand) || 0)}` : ""
                 }`
               : "0 orders"}
           </Text>
         </View>
-
-        {online && (
-          <View className="w-full gap-6 rounded-[20px] bg-card px-4 pb-1.5 pt-2 shadow-md shadow-black/10">
-            <View className="w-full flex-row items-center gap-2.5">
-              <Text className="text-lg">🎯</Text>
-              <Text className="flex-1 font-jakarta-medium text-sm text-foreground">
-                {BONUS_MOCK.bonusTarget} more orders before 3 PM → ₹{BONUS_MOCK.bonusAmount} bonus
-              </Text>
-            </View>
-            <View className="h-1 w-full overflow-hidden rounded-full bg-border">
-              <View
-                className="h-full rounded-full bg-warning"
-                style={{ width: `${BONUS_MOCK.bonusProgressPct}%` }}
-              />
-            </View>
-          </View>
-        )}
 
         {hydrateError && (
           <Pressable onPress={fetchDutyStatus}>

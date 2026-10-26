@@ -86,21 +86,8 @@ export default function CodCollection() {
           </Text>
         </View>
 
-        <View className="w-full items-center gap-2 rounded-[20px] bg-card px-4 pb-9 pt-2 shadow-md shadow-black/10">
-          <Text className="py-1.5 text-center text-sm text-muted-foreground">
-            Scan to pay via UPI
-          </Text>
-          <View className="size-[148px] items-center justify-center rounded-xl bg-muted">
-            <Text className="text-sm text-muted-foreground">QR Code</Text>
-          </View>
-        </View>
-
-        <View className="w-full flex-row items-center gap-3 py-1.5">
-          <View className="h-px flex-1 bg-border" />
-          <Text className="text-sm text-muted-foreground">or</Text>
-          <View className="h-px flex-1 bg-border" />
-        </View>
-
+        {/* No UPI QR here: the backend has no way to generate one for an order or to confirm a
+            UPI payment to it, and a placeholder box told riders to "scan to pay" at nothing. */}
         <Button
           variant={cashReceived ? "default" : "secondary"}
           size="sm"

@@ -123,7 +123,7 @@ export default function VerificationStatus() {
           {verificationStatus === "approved" ? (
             <Button onPress={handleContinueToTraining}>Continue to training</Button>
           ) : (
-            <Button>Contact support</Button>
+            <Button onPress={() => navigation.navigate("ProfileHelpSupport")}>Contact support</Button>
           )}
           <Button variant="secondary" size="sm" onPress={() => navigation.navigate("OnboardingDocuments")}>
             View uploaded documents

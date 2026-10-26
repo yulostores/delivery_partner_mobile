@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -59,6 +59,19 @@ function SegmentedControl({ options, value, onChange }) {
   );
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+
+// The message to show, or null when the form can be sent.
+function validatePersonal({ fullName, email, emergencyPhone, aadharNumber, panNumber }) {
+  if (fullName.trim().length < 2) return "Enter your full name.";
+  if (email.trim() && !EMAIL_RE.test(email.trim())) return "Enter a valid email address, or leave it blank.";
+  if (emergencyPhone.trim() && !/^\d{10}$/.test(emergencyPhone.trim())) return "Emergency contact must be a 10-digit mobile number.";
+  if (aadharNumber.trim() && !/^\d{12}$/.test(aadharNumber.replace(/\s/g, ""))) return "Aadhaar number must be 12 digits.";
+  if (panNumber.trim() && !PAN_RE.test(panNumber.trim().toUpperCase())) return "Enter a valid PAN (e.g. ABCDE1234F).";
+  return null;
+}
+
 export default function PersonalInformation() {
   const navigation = useNavigation();
   const { params } = useRoute();
@@ -90,8 +103,12 @@ export default function PersonalInformation() {
   const today = new Date();
   const hundredYearsAgo = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
 
+  // Filled from the profile once. Re-filling on every refetch (another screen mounting, a cache
+  // invalidation) overwrote whatever the rider had typed so far.
+  const seededRef = useRef(false);
   useEffect(() => {
-    if (!partner) return;
+    if (!partner || seededRef.current) return;
+    seededRef.current = true;
     setFullName(partner.fullName ?? "");
     setEmail(partner.email ?? "");
     setDob(partner.dateOfBirth ? new Date(partner.dateOfBirth) : null);
@@ -106,17 +123,24 @@ export default function PersonalInformation() {
     // blank while the partner's REAL saved data is untouched server-side — submitting anyway
     // would silently overwrite it with empty strings. Block rather than risk that.
     if (profileError) return;
+    const validationError = validatePersonal({ fullName, email, emergencyPhone, aadharNumber, panNumber });
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
+      // Blank optional fields are left out rather than sent as "": the server validates a sent
+      // email as an email, so an empty one was refused and the rider couldn't get past this step.
       await client.patch("/partner/onboarding/personal", {
-        fullName,
-        email,
+        fullName: fullName.trim(),
+        email: email.trim() || undefined,
         dateOfBirth: toDateOnlyString(dob),
         gender,
-        emergencyPhone,
-        aadharNumber,
-        panNumber,
+        emergencyPhone: emergencyPhone.trim() || undefined,
+        aadharNumber: aadharNumber.replace(/\s/g, "") || undefined,
+        panNumber: panNumber.trim().toUpperCase() || undefined,
       });
       // Without this, Profile's PersonalDetails/Profile screens (which read this same query key)
       // would keep showing the pre-edit values for up to staleTime (60s) after returning —

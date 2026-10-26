@@ -17,7 +17,16 @@ const GUIDELINES = [
   "Text sharp and readable",
 ];
 
+// The server's per-file limit (yulo_backend middleware/uploadDocuments.js). Checked here first so a
+// rider with a high-resolution camera gets a clear message instead of a failed upload.
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+// Photos are re-encoded as JPEG at this quality, which keeps a document legible and well under the limit.
+export const PHOTO_QUALITY = 0.5;
+
 export async function uploadDocumentAsset(docType, asset) {
+  if (asset.fileSize && asset.fileSize > MAX_UPLOAD_BYTES) {
+    throw new Error("This photo is larger than 5 MB. Please retake it, or choose a smaller image.");
+  }
   const fieldName = DOCUMENT_FIELD_NAMES[docType];
   const form = new FormData();
 
@@ -68,7 +77,7 @@ export default function DocumentCapture() {
       setError("Camera permission is needed to capture your document.");
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    const result = await ImagePicker.launchCameraAsync({ quality: PHOTO_QUALITY });
     if (!result.canceled) await complete(result.assets[0]);
   }
 
@@ -79,7 +88,7 @@ export default function DocumentCapture() {
       setError("Photo library permission is needed to upload your document.");
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: PHOTO_QUALITY });
     if (!result.canceled) await complete(result.assets[0]);
   }
 

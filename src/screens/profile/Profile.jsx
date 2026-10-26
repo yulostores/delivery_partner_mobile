@@ -126,7 +126,7 @@ export default function Profile() {
               mock-data problem this step exists to fix, just moved into a comment instead of a
               constant. Real rating only. */}
           <Text className="text-xs text-muted-foreground">
-            ⭐ {partner ? partner.rating.toFixed(1) : "—"} · {partner?.totalDeliveries ?? 0} deliveries
+            ⭐ {partner ? (Number(partner.rating) || 0).toFixed(1) : "—"} · {partner?.totalDeliveries ?? 0} deliveries
           </Text>
         </View>
       </View>

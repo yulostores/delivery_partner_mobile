@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -87,8 +87,11 @@ export default function VehicleDetailsForm() {
   const tenYearsAgo = new Date(today.getFullYear() - 10, today.getMonth(), today.getDate());
   const twentyYearsAhead = new Date(today.getFullYear() + 20, today.getMonth(), today.getDate());
 
+  // Filled from the profile once — re-filling on every refetch overwrote what the rider had typed.
+  const seededRef = useRef(false);
   useEffect(() => {
-    if (!vehicle) return;
+    if (!vehicle || seededRef.current) return;
+    seededRef.current = true;
     setType(vehicle.type ?? VEHICLE_TYPES[0].value);
     setModel(vehicle.model ?? "");
     setNumber(vehicle.number ?? "");

@@ -9,6 +9,7 @@ import BottomNav from "@/components/partner/BottomNav";
 import client from "@/api/client";
 import { formatCurrency } from "@/lib/format";
 import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
+import { getCurrentRoute } from "@/navigation/navigationRef";
 
 const MAP_BG = { veg: "#0d1a0d", standard: "#0d0d1f" };
 
@@ -46,10 +47,11 @@ export default function IncomingOrder() {
     if (!order) navigation.navigate("HomeOffline");
   }, [order, navigation]);
 
-  // Explicit "Skip" tap — goes through the reason picker, which calls the real reject API.
+  // Explicit "Skip" tap — goes through the reason picker, which calls the real reject API. Doesn't
+  // mark the offer as finished: the rider can close the picker and still accept, and the countdown
+  // keeps running underneath it (the picker sends them on when it actually rejects).
   function handleSkip() {
-    if (skippedRef.current) return;
-    skippedRef.current = true;
+    if (skippedRef.current || accepting) return;
     navigation.navigate("OrdersReject", { orderId: order.orderId });
   }
 
@@ -60,7 +62,13 @@ export default function IncomingOrder() {
   function handleTimeout() {
     if (skippedRef.current) return;
     skippedRef.current = true;
-    navigation.navigate("OrdersSkipConfirmed");
+    // Only moves the rider on if they are still looking at this offer (or its skip picker) — not
+    // when the picker already rejected it and they have moved on.
+    const current = getCurrentRoute();
+    const onThisOffer =
+      (current?.name === "OrdersIncoming" || current?.name === "OrdersReject") &&
+      String(current.params?.orderId) === String(order.orderId);
+    if (onThisOffer) navigation.navigate("OrdersSkipConfirmed");
   }
 
   useEffect(() => {

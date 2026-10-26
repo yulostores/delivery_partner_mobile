@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { Linking, Pressable, View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { PhoneCall } from "lucide-react-native";
 
@@ -7,6 +7,19 @@ import Button from "@/components/ui/Button";
 import Text from "@/components/ui/Text";
 import DeliveryMap from "@/components/delivery/DeliveryMap";
 import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
+
+// Turn-by-turn directions in Google Maps (the app on Android, the website elsewhere). Goes by the
+// coordinates when the order has them ([lng, lat], as on the map above) — more exact than an
+// address, which Maps has to search for — and by the address text otherwise.
+// dir_action=navigate starts navigation straight away; two-wheeler is Maps' bike-and-scooter mode.
+export function googleMapsDirectionsUrl(destination, address) {
+  const target =
+    Array.isArray(destination) && destination.length === 2
+      ? `${destination[1]},${destination[0]}`
+      : address;
+  if (!target) return null;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(target)}&travelmode=two-wheeler&dir_action=navigate`;
+}
 
 // Shared by "Go to Pickup" and "Navigate to Customer" — same layout in the
 // Figma design (map header + destination sheet with ETA/call/CTA), differing
@@ -27,6 +40,7 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
   const order = params?.order;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [linkError, setLinkError] = useState(null);
 
   // Reached with no real order (e.g. a stale/direct navigation) — bail to Home rather than crash
   // reading order.restaurantName etc. below. Matches IncomingOrder.jsx's same guard from Step 5.
@@ -49,6 +63,23 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
   const houseNumber = isPickup ? null : order.customerHouseNumber;
   const landmark = isPickup ? null : order.customerLandmark;
   const destination = isPickup ? order.restaurantLocation : order.dropoffLocation;
+  // The offer payload carries the customer's number (buildOfferPayload) but no restaurant number,
+  // so the call button only appears on the drop-off leg.
+  const phone = isPickup ? null : order.customerPhone;
+
+  const mapsUrl = googleMapsDirectionsUrl(destination, address);
+
+  function handleCall() {
+    setLinkError(null);
+    Linking.openURL(`tel:${String(phone).replace(/[^\d+]/g, "")}`).catch(() =>
+      setLinkError(`Couldn’t open the dialer — call ${phone}`),
+    );
+  }
+
+  function handleOpenMaps() {
+    setLinkError(null);
+    Linking.openURL(mapsUrl).catch(() => setLinkError("Couldn’t open Google Maps on this phone."));
+  }
 
   async function handleArrive() {
     if (busy) return;
@@ -89,9 +120,17 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
               <Text className="text-sm text-muted-foreground">Landmark: {landmark}</Text>
             ) : null}
           </View>
-          <View className="size-12 items-center justify-center rounded-full border-[1.5px] border-border">
-            <PhoneCall size={20} color="#1a1a1a" />
-          </View>
+          {phone ? (
+            <Pressable
+              onPress={handleCall}
+              accessibilityRole="button"
+              accessibilityLabel={`Call ${name ?? "customer"}`}
+              hitSlop={8}
+              className="size-12 items-center justify-center rounded-full border-[1.5px] border-border"
+            >
+              <PhoneCall size={20} color="#1a1a1a" />
+            </Pressable>
+          ) : null}
         </View>
 
         <View className="w-full flex-row items-center pt-1.5">
@@ -103,6 +142,13 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
         </View>
 
         {error && <Text className="text-center text-sm text-destructive">{error}</Text>}
+        {linkError && <Text className="text-center text-sm text-destructive">{linkError}</Text>}
+
+        {mapsUrl ? (
+          <Button variant="secondary" size="sm" onPress={handleOpenMaps}>
+            Open in Google Maps
+          </Button>
+        ) : null}
 
         <Button disabled={busy} onPress={handleArrive}>
           {busy ? "Please wait…" : isPickup ? "Reached restaurant" : "Reached customer"}

@@ -56,13 +56,11 @@ export default function PaymentReceived() {
   const rows = [
     { label: "Order amount", value: codAmount },
     { label: "Paid via", value: "Cash" },
-    { label: "Change returned", value: "—" },
     {
       label: "Your trip earning",
       value: tripEarning != null ? formatCurrency(tripEarning) : summaryError ? "Unavailable" : "…",
       accent: true,
     },
-    { label: "Deposit due", value: codAmount },
   ];
 
   return (

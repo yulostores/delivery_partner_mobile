@@ -11,9 +11,9 @@ import { hereStyle } from "@/lib/here";
 // module loads. Metro's platform-extension resolution means web never
 // evaluates this file's imports in the first place.
 //
-// Watches the partner's own position independently of the 30s
-// server-reporting loop in src/lib/locationPings.js, so the on-screen dot
-// feels live even though the server only hears from it every 30s.
+// Watches the partner's own position independently of the server-reporting
+// loop in src/lib/locationPings.js (every 15s or 50 m), so the on-screen dot
+// moves every few seconds.
 export default function DeliveryMap({ destination }) {
   const cameraRef = useRef(null);
   const [myLocation, setMyLocation] = useState(null);
@@ -46,6 +46,16 @@ export default function DeliveryMap({ destination }) {
       subscription?.remove();
     };
   }, []);
+
+  // No destination (Home's map): centre on the rider once, when the first fix arrives —
+  // initialViewState only applies on mount, before any fix exists. Only once, so the rider can
+  // pan around without the map snapping back every few seconds.
+  const centredOnMeRef = useRef(false);
+  useEffect(() => {
+    if (destination || !myLocation || centredOnMeRef.current) return;
+    centredOnMeRef.current = true;
+    cameraRef.current?.easeTo({ center: myLocation, zoom: 14, duration: 500 });
+  }, [destination, myLocation]);
 
   // Fit both pins in view once both are known; falls back to centering on
   // whichever one is available so the map never renders with an undefined

@@ -8,7 +8,7 @@ import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import AppBar from "@/components/partner/AppBar";
 import { useOnboarding } from "@/context/OnboardingContext";
-import { uploadDocumentAsset } from "@/screens/onboarding/DocumentCapture";
+import { PHOTO_QUALITY, uploadDocumentAsset } from "@/screens/onboarding/DocumentCapture";
 
 // Figma "22 – Selfie Capture" only calls for a single guideline row (vs. the
 // three shown on "21 – Document Capture") — see node 464:1547.
@@ -42,7 +42,7 @@ export default function SelfieCapture() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      quality: 0.7,
+      quality: PHOTO_QUALITY,
       cameraType: ImagePicker.CameraType.front,
     });
     if (!result.canceled) await complete(result.assets[0]);
@@ -55,7 +55,7 @@ export default function SelfieCapture() {
       setError("Photo library permission is needed to upload your selfie.");
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: PHOTO_QUALITY });
     if (!result.canceled) await complete(result.assets[0]);
   }
 

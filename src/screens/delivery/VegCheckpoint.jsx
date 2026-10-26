@@ -35,7 +35,7 @@ export default function VegCheckpoint() {
   const order = params?.order;
   const isVeg = order?.fleetType === "veg";
 
-  const [checklist, setChecklist] = useState({ sealIntact: true, tempBagUsed: false });
+  const [checklist, setChecklist] = useState({ sealIntact: false, tempBagUsed: false });
   const [otp, setOtp] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -89,8 +89,8 @@ export default function VegCheckpoint() {
       <View className="w-full gap-4 px-6 pt-5">
         <View className="w-full gap-3.5 rounded-[20px] bg-card px-4 py-3.5 shadow-md shadow-black/10">
           <Text className="font-jakarta-semibold text-sm text-foreground">Order items</Text>
-          {order.items.map((item) => (
-            <Text key={item.name} className="w-full text-sm text-foreground">
+          {(order.items ?? []).map((item, i) => (
+            <Text key={`${i}:${item.name}`} className="w-full text-sm text-foreground">
               {item.name} × {item.qty}
             </Text>
           ))}

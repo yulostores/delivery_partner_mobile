@@ -37,7 +37,7 @@ export default function PhoneEntry() {
     <Screen>
       <View className="h-[200px] w-full gap-1 bg-primary px-6 pb-6 pt-[38px]">
         <Text className="font-jakarta-bold text-2xl leading-[30px] text-white">
-          FoodHub Delivery
+          Yulo Delivery Partner
         </Text>
         <View className="gap-0.5">
           <Text className="text-sm leading-[18px] text-white">Earn on your schedule</Text>

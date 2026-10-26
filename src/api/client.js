@@ -20,6 +20,17 @@ export function getAccessToken() {
   return _accessToken;
 }
 
+// Told when the server refuses the refresh token (it expired after 30 days, or was revoked), so
+// the app can send the rider back to sign-in. Clearing the tokens alone left the app looking
+// signed in while every screen failed with 401.
+let _onSessionExpired = null;
+export function setSessionExpiredHandler(handler) {
+  _onSessionExpired = handler;
+}
+
+// Sign-in calls carry no token; logout does (the server needs it to revoke the session).
+const PUBLIC_AUTH_PATHS = new Set(["/partner/auth/request-otp", "/partner/auth/verify-otp", "/partner/auth/refresh"]);
+
 // One refresh at a time, however many callers ask at once.
 let _refreshPromise = null;
 
@@ -39,8 +50,12 @@ export function refreshAccessToken() {
         setAccessToken(data.data.accessToken);
         return data.data.accessToken;
       } catch (err) {
-        // Only a refused refresh means the session is over; a network blip keeps it.
-        if (err?.response?.status === 401 || err?.response?.status === 400) return null;
+        // Only a refused refresh means the session is over; a network blip keeps it. Reported from
+        // here so every caller (screens, the socket, background location pings) ends it the same way.
+        if (err?.response?.status === 401 || err?.response?.status === 400) {
+          if (generation === _sessionGeneration) _onSessionExpired?.();
+          return null;
+        }
         throw err;
       } finally {
         _refreshPromise = null;
@@ -79,7 +94,7 @@ client.interceptors.request.use(async (config) => {
   // No token in memory but a session on the phone (app opened offline, or a fresh JS context):
   // mint one first. Sent with no token at all, the request would fail with an error the
   // refresh-on-401 below doesn't retry. Sign-in calls themselves never need one.
-  if (!token && !config.url?.startsWith("/partner/auth/")) {
+  if (!token && !PUBLIC_AUTH_PATHS.has(config.url)) {
     token = await refreshAccessToken().catch(() => null);
   }
   if (token) config.headers.Authorization = `Bearer ${token}`;

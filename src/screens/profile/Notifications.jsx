@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Switch, View } from "react-native";
 import { Package, Settings, Target, Volume2, Wallet } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -44,8 +44,11 @@ export default function Notifications() {
     queryFn: () => client.get("/partner/profile"),
   });
 
+  // Filled from the profile once — a refetch mid-edit used to flip the rider's toggles back.
+  const seededRef = useRef(false);
   useEffect(() => {
-    if (data?.partner?.notificationPreferences) {
+    if (data?.partner?.notificationPreferences && !seededRef.current) {
+      seededRef.current = true;
       setPrefs({ ...DEFAULTS, ...data.partner.notificationPreferences });
     }
   }, [data]);

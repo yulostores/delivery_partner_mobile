@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -53,6 +53,19 @@ function SegmentedControl({ options, value, onChange }) {
   );
 }
 
+const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const UPI_RE = /^[\w.-]{2,}@[a-zA-Z]{2,}$/;
+
+// The message to show, or null when the form can be sent. Payouts go to these details, so a typo
+// here means a failed or misdirected payment.
+function validateBank({ accountHolderName, accountNumber, ifsc, upiId }) {
+  if (accountHolderName.trim().length < 2) return "Enter the account holder's name.";
+  if (!/^\d{9,18}$/.test(accountNumber.replace(/\s/g, ""))) return "Account number must be 9 to 18 digits.";
+  if (!IFSC_RE.test(ifsc.trim().toUpperCase())) return "Enter a valid IFSC code (e.g. SBIN0001234).";
+  if (upiId.trim() && !UPI_RE.test(upiId.trim())) return "Enter a valid UPI ID (e.g. name@bank), or leave it blank.";
+  return null;
+}
+
 export default function BankPaymentDetails() {
   const navigation = useNavigation();
   const { params } = useRoute();
@@ -80,8 +93,11 @@ export default function BankPaymentDetails() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  // Filled from the profile once — re-filling on every refetch overwrote what the rider had typed.
+  const seededRef = useRef(false);
   useEffect(() => {
-    if (!bankDetails) return;
+    if (!bankDetails || seededRef.current) return;
+    seededRef.current = true;
     setBankName(bankDetails.bankName ?? "");
     setAccountHolderName(bankDetails.accountHolderName ?? "");
     setAccountNumber(bankDetails.accountNumber ?? "");
@@ -96,18 +112,23 @@ export default function BankPaymentDetails() {
     // blank while the partner's real saved bank details are untouched server-side; submitting
     // anyway would overwrite them with empty strings before submit-for-review even runs.
     if (profileError) return;
+    const validationError = validateBank({ accountHolderName, accountNumber, ifsc, upiId });
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       await client.patch("/partner/onboarding/bank", {
         bankDetails: {
           bankName,
-          accountHolderName,
-          accountNumber,
+          accountHolderName: accountHolderName.trim(),
+          accountNumber: accountNumber.replace(/\s/g, ""),
           accountType,
-          ifscCode: ifsc,
+          ifscCode: ifsc.trim().toUpperCase(),
           branchName,
-          upiId,
+          upiId: upiId.trim() || undefined,
         },
       });
 
@@ -186,7 +207,7 @@ export default function BankPaymentDetails() {
           <Input
             value={accountNumber}
             onChangeText={setAccountNumber}
-            autoCapitalize="characters"
+            keyboardType="number-pad"
             className="rounded-2xl"
           />
         </Field>
@@ -227,7 +248,7 @@ export default function BankPaymentDetails() {
         {error && <Text className="text-center text-sm text-destructive">{error}</Text>}
 
         <Text className="text-center text-xs text-muted-foreground">
-          Payouts are settled daily to your selected account or UPI ID.
+          Your earnings are paid out to this bank account.
         </Text>
       </ScrollView>
     </Screen>

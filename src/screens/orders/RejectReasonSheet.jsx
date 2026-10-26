@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { SKIP_REASONS } from "@/mocks/fixtures";
 import client from "@/api/client";
+import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
 
 // Presented as a transparentModal (see RootNavigator.jsx), matching
 // FleetBadgeInfo's overlay pattern. Tapping a reason confirms immediately —
@@ -32,6 +33,8 @@ export default function RejectReasonSheet() {
     } catch (err) {
       if (err.code === "OFFER_EXPIRED" || err.code === "NOT_YOUR_OFFER") {
         navigation.navigate("HomeOffline");
+      } else if (isOrderGone(err)) {
+        leaveGoneOrder(err.code);
       } else {
         setError(err.message);
         setSubmitting(false);

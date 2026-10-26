@@ -2,11 +2,20 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQueryClient } from "@tanstack/react-query";
 
-import client, { refreshAccessToken, setAccessToken } from "@/api/client";
+import client, { refreshAccessToken, setAccessToken, setSessionExpiredHandler } from "@/api/client";
 import { setRefreshToken, clearRefreshToken } from "@/api/tokenStorage";
 import { disconnectPartnerSocket } from "@/lib/partnerSocket";
 import { stopLocationPings } from "@/lib/locationPings";
 import { unregisterPushToken } from "@/lib/pushNotifications";
+import { clearDutyStart } from "@/lib/dutyClock";
+import { navigationRef } from "@/navigation/navigationRef";
+
+// Back to the phone-number screen with nothing underneath, so Back can't return to a signed-in screen.
+function resetToSignIn() {
+  if (navigationRef.isReady()) {
+    navigationRef.reset({ index: 0, routes: [{ name: "Onboarding" }] });
+  }
+}
 
 const PROFILE_KEY = "yulo_partner_profile";
 
@@ -97,27 +106,44 @@ export function PartnerAuthProvider({ children }) {
     [pendingPhone, queryClient],
   );
 
-  const logout = useCallback(async () => {
-    // While still signed in — the server needs the session to know whose phone to forget.
-    await unregisterPushToken();
-    try {
-      await client.post("/partner/auth/logout");
-    } catch {
-      // Best-effort — even if this fails (network down, token already invalid), still clear
-      // everything client-side below so the user isn't stuck "logged in" locally.
-    }
+  // Everything held on this phone for the session, dropped. Shared by logout and by a session the
+  // server has ended (refresh token expired or revoked).
+  const clearLocalSession = useCallback(async () => {
     // Without this, a partner who logs out while online stays joined to their partner:{id}
     // socket room and counted in the backend's live:active_partners presence set under a
     // session that's no longer authenticated.
     disconnectPartnerSocket();
     stopLocationPings();
     setAccessToken(null);
-    await clearRefreshToken();
+    await clearRefreshToken().catch(() => {});
+    await clearDutyStart();
     queryClient.clear();
     setUser(null);
     setPendingPhone(null);
     setDevOtp(null);
   }, [queryClient]);
+
+  const logout = useCallback(async () => {
+    // While still signed in — the server needs the session for each of these. Going off duty
+    // first: otherwise the rider stays 'active' on the server and can still be picked for orders
+    // after signing out. Refused mid-delivery (PARTNER_BUSY), which is fine — best-effort.
+    await client.post("/partner/duty/toggle", { online: false }, { timeout: 5000 }).catch(() => {});
+    await unregisterPushToken();
+    try {
+      await client.post("/partner/auth/logout", null, { timeout: 5000 });
+    } catch {
+      // Best-effort — even if this fails (network down, token already invalid), still clear
+      // everything client-side below so the user isn't stuck "logged in" locally.
+    }
+    await clearLocalSession();
+  }, [clearLocalSession]);
+
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      clearLocalSession().finally(resetToSignIn);
+    });
+    return () => setSessionExpiredHandler(null);
+  }, [clearLocalSession]);
 
   return (
     <PartnerAuthContext.Provider
