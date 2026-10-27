@@ -8,6 +8,7 @@ import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import BottomNav from "@/components/partner/BottomNav";
 import { formatDuration } from "@/lib/format";
+import { goToTab } from "@/navigation/tabs";
 
 // Matches server/services/training.service.js's MAX_QUIZ_SCORE.
 const MAX_QUIZ_SCORE = 10;
@@ -17,7 +18,7 @@ export default function TrainingComplete() {
   const { params } = useRoute();
 
   useEffect(() => {
-    if (!params) navigation.navigate("HomeOffline");
+    if (!params) goToTab("HomeOffline");
   }, [params, navigation]);
 
   if (!params) return null;
@@ -40,7 +41,7 @@ export default function TrainingComplete() {
     if (hasNextModule) {
       navigation.navigate("OnboardingTraining");
     } else {
-      navigation.navigate("HomeOffline");
+      goToTab("HomeOffline");
     }
   }
 

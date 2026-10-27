@@ -8,6 +8,7 @@ import Text from "@/components/ui/Text";
 import BackButton from "@/components/partner/BackButton";
 import OtpInput from "@/components/partner/OtpInput";
 import { usePartnerAuth } from "@/context/PartnerAuthContext";
+import { goToTab } from "@/navigation/tabs";
 
 const RESEND_SECONDS = 28;
 
@@ -41,7 +42,7 @@ export default function OtpVerification() {
       // edit form instead of Home. verifyOtp() returns the real partner doc, so route on it:
       if (partner.verificationStatus === "approved") {
         // Bubbles up to the top-level Home route — not part of this nested Onboarding stack.
-        navigation.navigate("HomeOffline");
+        goToTab("HomeOffline");
       } else if (partner.fullName) {
         // Submitted personal info at least once before but isn't approved yet (under review,
         // rejected, or asked to resubmit) — VerificationStatus.jsx shows their real state and

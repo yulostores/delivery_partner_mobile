@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import Text from "@/components/ui/Text";
 import DeliveryMap from "@/components/delivery/DeliveryMap";
 import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
+import { goToTab } from "@/navigation/tabs";
 
 // Turn-by-turn directions in Google Maps (the app on Android, the website elsewhere). Goes by the
 // coordinates when the order has them ([lng, lat], as on the map above) — more exact than an
@@ -45,7 +46,7 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
   // Reached with no real order (e.g. a stale/direct navigation) — bail to Home rather than crash
   // reading order.restaurantName etc. below. Matches IncomingOrder.jsx's same guard from Step 5.
   useEffect(() => {
-    if (!order) navigation.navigate("HomeOffline");
+    if (!order) goToTab("HomeOffline");
   }, [order, navigation]);
 
   if (!order) return null;

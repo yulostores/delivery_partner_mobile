@@ -10,6 +10,7 @@ import AppBar from "@/components/partner/AppBar";
 import client from "@/api/client";
 import { formatCurrency } from "@/lib/format";
 import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
+import { goToTab } from "@/navigation/tabs";
 
 // The server's limit on a reported collection (deliverSchema in
 // server/controllers/partner/order.controller.js): at most ₹1,00,000, to the paisa.
@@ -38,7 +39,7 @@ export default function CodCollection() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!order) navigation.navigate("HomeOffline");
+    if (!order) goToTab("HomeOffline");
   }, [order, navigation]);
 
   if (!order) return null;

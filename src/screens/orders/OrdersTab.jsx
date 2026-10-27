@@ -5,7 +5,6 @@ import { Package } from "lucide-react-native";
 
 import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
-import BottomNav from "@/components/partner/BottomNav";
 import client from "@/api/client";
 
 // The bottom-nav "Orders" tab's landing screen. Shows what is live for the rider — an offer
@@ -68,7 +67,7 @@ export default function OrdersTab() {
   );
 
   return (
-    <Screen edges={["top", "bottom"]}>
+    <Screen edges={["top"]}>
       <View className="h-16 w-full flex-row items-center bg-card pl-6">
         <Text className="font-jakarta-semibold text-[16px] text-foreground">Orders</Text>
       </View>
@@ -124,7 +123,6 @@ export default function OrdersTab() {
         )}
       </View>
 
-      <BottomNav />
     </Screen>
   );
 }

@@ -10,6 +10,7 @@ import Text from "@/components/ui/Text";
 import BottomNav from "@/components/partner/BottomNav";
 import client from "@/api/client";
 import { formatCurrency } from "@/lib/format";
+import { goToTab } from "@/navigation/tabs";
 
 // The trip's earning: the server's own total (GET …/summary — base + distance pay + surge +
 // tip − penalty). An older backend without `total` falls back to the same sum of its parts.
@@ -26,7 +27,7 @@ export default function PaymentReceived() {
   const order = params?.order;
 
   useEffect(() => {
-    if (!order) navigation.navigate("HomeOffline");
+    if (!order) goToTab("HomeOffline");
   }, [order, navigation]);
 
   // CodCollection.jsx already called POST .../deliver before navigating here, so the frozen
@@ -117,7 +118,7 @@ export default function PaymentReceived() {
           </Text>
         </View>
 
-        <Button onPress={() => navigation.navigate("HomeOffline")}>Done — next order</Button>
+        <Button onPress={() => goToTab("HomeOffline")}>Done — next order</Button>
       </View>
 
       <BottomNav />

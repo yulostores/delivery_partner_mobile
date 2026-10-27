@@ -1,8 +1,11 @@
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { usePartnerAuth } from "@/context/PartnerAuthContext";
 import { OnboardingProvider } from "@/context/OnboardingContext";
 import PlaceholderScreen from "@/components/partner/PlaceholderScreen";
+import BottomNav from "@/components/partner/BottomNav";
+import { MAIN } from "@/navigation/tabs";
 
 import PhoneEntry from "@/screens/onboarding/PhoneEntry";
 import OtpVerification from "@/screens/onboarding/OtpVerification";
@@ -41,6 +44,7 @@ import RequestSubmitted from "@/screens/profile/RequestSubmitted";
 import ReportIssue from "@/screens/profile/ReportIssue";
 
 const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
 // Flat stack mirroring the flow-by-flow screen inventory from the plan doc —
 // every one of the 32 screens gets a route from day one (real or stub) so
@@ -72,6 +76,27 @@ function OnboardingStack() {
   );
 }
 
+// Home / Orders / Earn / Profile: a real tab navigator. Switching tabs keeps each screen mounted
+// and just shows another one — no native push, no transition, nothing to reset. They used to be
+// root-stack screens, and quick switching between them could leave the native stack
+// mid-transition with every touch blocked until the app was restarted (see BottomNav.jsx).
+// Hardware Back from another tab returns to Home, then leaves the app.
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      initialRouteName="HomeOffline"
+      backBehavior="firstRoute"
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <BottomNav state={props.state} navigation={props.navigation} />}
+    >
+      <Tab.Screen name="HomeOffline" component={Home} />
+      <Tab.Screen name="OrdersTab" component={OrdersTab} />
+      <Tab.Screen name="Earnings" component={Earnings} initialParams={{ period: "today" }} />
+      <Tab.Screen name="Profile" component={Profile} />
+    </Tab.Navigator>
+  );
+}
+
 export default function RootNavigator() {
   // No auth-aware routing existed here at all before this — initialRouteName was hardcoded to
   // "Onboarding" unconditionally, so even a fully persisted, still-valid session would land back
@@ -88,23 +113,17 @@ export default function RootNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{ headerShown: false }}
-      initialRouteName={isAuthenticated ? "HomeOffline" : "Onboarding"}
+      initialRouteName={isAuthenticated ? MAIN : "Onboarding"}
     >
       <Stack.Screen name="Onboarding" component={OnboardingStack} />
-      {/* One Home, ever. React Navigation 7's navigate() pushes a new screen rather than going
-          back to an existing one, so every "Done" / "Back to home" stacked another Home on top
-          of the finished delivery's screens — each still mounted, each Home re-checking duty
-          status on every return to the app. With a fixed id, navigate() brings the existing Home
-          back; Home then clears whatever was left underneath it (see Home.jsx). */}
-      <Stack.Screen name="HomeOffline" component={Home} getId={() => "home"} />
+      {/* The tabs, once. Everything else opens on top of it; goToTab() (navigation/tabs.js) pops
+          back down to it, so "Done" / "Back to home" never stacks a second copy. */}
+      <Stack.Screen name={MAIN} component={MainTabs} />
       <Stack.Screen
         name="FleetBadgeInfo"
         component={FleetBadgeInfo}
         options={{ presentation: "transparentModal", animation: "fade" }}
       />
-      {/* Bottom-bar destinations keep one instance each, like Home: a fixed id makes navigate()
-          bring the existing screen back instead of stacking another copy on every tap. */}
-      <Stack.Screen name="OrdersTab" component={OrdersTab} getId={() => "orders-tab"} />
       {/* A single route now — fleetType comes from the real order_offer payload (see
           partnerSocket.js), not from which of two routes got registered. */}
       {/* One screen per OFFER (order id + when that offer lapses): a new offer — including the
@@ -131,19 +150,10 @@ export default function RootNavigator() {
       <Stack.Screen name="DeliveryCodCollection" component={CodCollection} />
       <Stack.Screen name="DeliveryPaymentReceived" component={PaymentReceived} />
       <Stack.Screen name="DeliverySummary" component={DeliverySummary} />
-      <Stack.Screen
-        name="Earnings"
-        component={Earnings}
-        initialParams={{ period: "today" }}
-        getId={() => "earnings"}
-      />
-      <Stack.Screen name="EarningsWeekly" component={Earnings} initialParams={{ period: "weekly" }} />
-      <Stack.Screen name="EarningsMonthly" component={Earnings} initialParams={{ period: "monthly" }} />
       <Stack.Screen name="EarningsCashDeposit" component={CashDeposit} />
       {/* Was imported but never registered — CashDeposit.jsx's navigate("EarningsDepositConfirmed")
           targeted a route that didn't exist at all. */}
       <Stack.Screen name="EarningsDepositConfirmed" component={DepositConfirmed} />
-      <Stack.Screen name="Profile" component={Profile} getId={() => "profile"} />
       <Stack.Screen name="ProfilePersonalDetails" component={PersonalDetails} />
       <Stack.Screen name="ProfileVehicleDetails" component={VehicleDetails} />
       <Stack.Screen name="ProfileDocuments" component={DocumentsUploaded} />

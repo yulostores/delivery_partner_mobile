@@ -11,6 +11,7 @@ import Text from "@/components/ui/Text";
 import AppBar from "@/components/partner/AppBar";
 import client from "@/api/client";
 import { formatDateTime } from "@/lib/format";
+import { goToTab } from "@/navigation/tabs";
 
 const STEPS = [
   { label: "Submitted", align: "left" },
@@ -112,7 +113,7 @@ export default function RequestSubmitted() {
         <View className="flex-1" />
 
         <View className="w-full gap-3">
-          <Button className="w-full" onPress={() => navigation.navigate("Profile")}>
+          <Button className="w-full" onPress={() => goToTab("Profile")}>
             Back to profile
           </Button>
           <Button

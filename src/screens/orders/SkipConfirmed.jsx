@@ -7,6 +7,7 @@ import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import AppBar from "@/components/partner/AppBar";
 import Stepper from "@/components/partner/Stepper";
+import { goToTab } from "@/navigation/tabs";
 
 export default function SkipConfirmed() {
   const navigation = useNavigation();
@@ -34,7 +35,7 @@ export default function SkipConfirmed() {
         </View>
 
         <View className="w-full pt-11">
-          <Button onPress={() => navigation.navigate("HomeOffline")}>Back to home</Button>
+          <Button onPress={() => goToTab("HomeOffline")}>Back to home</Button>
         </View>
       </View>
     </Screen>

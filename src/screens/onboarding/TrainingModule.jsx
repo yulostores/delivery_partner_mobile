@@ -12,6 +12,7 @@ import { useOnboarding } from "@/context/OnboardingContext";
 import { formatDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import client from "@/api/client";
+import { goToTab } from "@/navigation/tabs";
 
 const CHECKLIST = [
   "Inspect bag seal before every pickup",
@@ -50,7 +51,7 @@ export default function TrainingModule() {
   useEffect(() => {
     if (!isFocused) return;
     if (trainingError || (training && !training.moduleId)) {
-      navigation.navigate("HomeOffline");
+      goToTab("HomeOffline");
     }
   }, [trainingError, training, navigation, isFocused]);
 

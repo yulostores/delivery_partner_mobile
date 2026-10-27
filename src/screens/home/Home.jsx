@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import Button from "@/components/ui/Button";
 import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
-import BottomNav from "@/components/partner/BottomNav";
 import DeliveryMap from "@/components/delivery/DeliveryMap";
 import client from "@/api/client";
 import { connectPartnerSocket, disconnectPartnerSocket } from "@/lib/partnerSocket";
@@ -116,28 +115,6 @@ export default function Home() {
     return () => clearInterval(intervalRef.current);
   }, [fetchDutyStatus]);
 
-  // Home is the root: arriving here (after a delivery, a skipped offer, a cancellation notice…)
-  // drops every screen left underneath, so finished flows don't stay mounted and Back from Home
-  // leaves the app instead of walking back through an old delivery. Waits for the transition so
-  // the screens aren't pulled out mid-animation. The route keeps its key, so Home isn't remounted.
-  useEffect(() => {
-    let timer = null;
-    const unsubscribe = navigation.addListener("focus", () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const state = navigation.getState();
-        if (!state || state.routes.length <= 1) return;
-        const self = state.routes[state.index];
-        if (self?.name !== "HomeOffline") return;
-        navigation.reset({ index: 0, routes: [self] });
-      }, 400);
-    });
-    return () => {
-      clearTimeout(timer);
-      unsubscribe();
-    };
-  }, [navigation]);
-
   // App backgrounding doesn't unmount this screen (no fresh mount-effect fires), so on return to
   // the foreground: re-read the duty status, and if on duty rejoin the socket the OS may have
   // dropped and open any offer that arrived meanwhile (fetchDutyStatus does all of that).
@@ -215,7 +192,7 @@ export default function Home() {
   const firstName = profileData?.partner?.fullName?.split(" ")[0];
 
   return (
-    <Screen edges={["top", "bottom"]}>
+    <Screen edges={["top"]}>
       <View className="h-16 w-full flex-row items-center justify-between bg-card pl-6 pr-5">
         <Text className="font-jakarta-semibold text-[16px] text-foreground">
           {greetingFor(new Date().getHours())}{firstName ? `, ${firstName}` : ""}
@@ -309,7 +286,6 @@ export default function Home() {
         </Button>
       </View>
 
-      <BottomNav />
     </Screen>
   );
 }

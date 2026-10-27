@@ -18,9 +18,9 @@ import {
 import Button from "@/components/ui/Button";
 import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
-import BottomNav from "@/components/partner/BottomNav";
 import { usePartnerAuth } from "@/context/PartnerAuthContext";
 import client from "@/api/client";
+import { navigationRef } from "@/navigation/navigationRef";
 
 const MENU_SECTIONS = [
   {
@@ -103,11 +103,12 @@ export default function Profile() {
 
   function handleConfirmLogout() {
     logout();
-    navigation.reset({ index: 0, routes: [{ name: "Onboarding" }] });
+    // The root stack, not this tab navigator — Onboarding lives at the root.
+    navigationRef.reset({ index: 0, routes: [{ name: "Onboarding" }] });
   }
 
   return (
-    <Screen edges={["top", "bottom"]}>
+    <Screen edges={["top"]}>
       <View className="h-[112px] w-full flex-row gap-4 bg-card px-6 pb-3 pt-[18px]">
         <View className="size-12 items-center justify-center rounded-full bg-primary">
           <Text className="font-jakarta-bold text-lg text-white">
@@ -172,8 +173,6 @@ export default function Profile() {
           </View>
         </View>
       )}
-
-      <BottomNav />
     </Screen>
   );
 }

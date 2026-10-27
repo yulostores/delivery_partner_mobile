@@ -11,6 +11,7 @@ import OtpInput from "@/components/partner/OtpInput";
 import { cn } from "@/lib/utils";
 import client from "@/api/client";
 import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
+import { goToTab } from "@/navigation/tabs";
 
 // Matches server/controllers/partner/order.controller.js's packagingChecklist fields exactly
 // (sealIntact, tempBagUsed). The old second item, "No other order in bag", didn't correspond to
@@ -41,7 +42,7 @@ export default function VegCheckpoint() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!order) navigation.navigate("HomeOffline");
+    if (!order) goToTab("HomeOffline");
   }, [order, navigation]);
 
   if (!order) return null;

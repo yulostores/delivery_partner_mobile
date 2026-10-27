@@ -8,6 +8,7 @@ import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import BottomNav from "@/components/partner/BottomNav";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { goToTab } from "@/navigation/tabs";
 
 export default function DepositConfirmed() {
   const navigation = useNavigation();
@@ -16,7 +17,7 @@ export default function DepositConfirmed() {
   const cashInHandAfter = params?.cashInHandAfter;
 
   useEffect(() => {
-    if (!deposit) navigation.navigate("HomeOffline");
+    if (!deposit) goToTab("HomeOffline");
   }, [deposit, navigation]);
 
   if (!deposit) return null;
@@ -66,7 +67,7 @@ export default function DepositConfirmed() {
           </View>
         </View>
 
-        <Button onPress={() => navigation.navigate("HomeOffline")}>Done</Button>
+        <Button onPress={() => goToTab("HomeOffline")}>Done</Button>
       </View>
 
       <BottomNav />

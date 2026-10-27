@@ -10,6 +10,7 @@ import AppBar from "@/components/partner/AppBar";
 import Stepper from "@/components/partner/Stepper";
 import client from "@/api/client";
 import { ONBOARDING_STATUS_KEY } from "@/context/OnboardingContext";
+import { goToTab } from "@/navigation/tabs";
 
 const STATUS_COPY = {
   pending_documents: {
@@ -131,7 +132,7 @@ export default function VerificationStatus() {
           {/* Lets a partner mid-review leave this screen instead of being stuck between
               "Contact support" and "View uploaded documents" — Home renders fine pre-approval,
               it just won't have orders/earnings yet. */}
-          <Button variant="ghost" size="sm" onPress={() => navigation.navigate("HomeOffline")}>
+          <Button variant="ghost" size="sm" onPress={() => goToTab("HomeOffline")}>
             Go to home
           </Button>
         </View>

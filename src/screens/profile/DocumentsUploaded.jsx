@@ -9,6 +9,7 @@ import Text from "@/components/ui/Text";
 import AppBar from "@/components/partner/AppBar";
 import client from "@/api/client";
 import { DOCUMENT_TYPES } from "@/mocks/fixtures";
+import { goToTab } from "@/navigation/tabs";
 
 // Every document on this screen is already uploaded — unlike
 // DocumentRow.jsx's 3-state (pending/next/uploaded) logic used on the
@@ -68,7 +69,7 @@ export default function DocumentsUploaded() {
       {/* Explicit target, not onBack={true}'s goBack() — this screen is also reachable via the
           profile/documents deep link (see linking.js) with no prior screen on the stack, where
           goBack() would just no-op. */}
-      <AppBar title="Documents Uploaded" onBack={() => navigation.navigate("Profile")} />
+      <AppBar title="Documents Uploaded" onBack={() => goToTab("Profile")} />
 
       <View className="gap-4 px-6 pb-6 pt-2">
         {DOCUMENT_TYPES.map((doc) => (

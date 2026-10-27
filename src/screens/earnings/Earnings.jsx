@@ -6,7 +6,6 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import AppBar from "@/components/partner/AppBar";
-import BottomNav from "@/components/partner/BottomNav";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
 import { usePartnerConfig } from "@/lib/partnerConfig";
@@ -105,11 +104,10 @@ export default function Earnings() {
   });
   const cashInHand = cashInHandData?.cashInHand;
 
-  // A bare `if (!data) return null` here would leave a permanently-failing fetch as a blank
-  // screen forever (no AppBar, no BottomNav, no way back) — show a retry instead.
+  // A failed fetch shows a retry rather than a blank page.
   if (isError) {
     return (
-      <Screen edges={["top", "bottom"]}>
+      <Screen edges={["top"]}>
         <AppBar title="Earnings" />
         <View className="w-full flex-1 items-center justify-center px-6">
           <Pressable onPress={() => refetch()}>
@@ -118,26 +116,23 @@ export default function Earnings() {
             </Text>
           </Pressable>
         </View>
-        <BottomNav />
       </Screen>
     );
   }
-  // First load: the bar and title stay on screen. Returning nothing here left a blank page with
-  // no bottom bar until the request finished — on a slow connection the tabs looked dead.
+  // First load: a loading line under the title rather than a blank page.
   if (!data) {
     return (
-      <Screen edges={["top", "bottom"]}>
+      <Screen edges={["top"]}>
         <AppBar title="Earnings" />
         <View className="w-full flex-1 items-center justify-center px-6">
           <Text className="text-center text-sm text-muted-foreground">Loading earnings…</Text>
         </View>
-        <BottomNav />
       </Screen>
     );
   }
 
   return (
-    <Screen edges={["top", "bottom"]}>
+    <Screen edges={["top"]}>
       <AppBar title="Earnings" />
 
       <ScrollView className="w-full flex-1" contentContainerClassName="gap-4 px-6 pb-6 pt-3">
@@ -223,8 +218,6 @@ export default function Earnings() {
           </Pressable>
         )}
       </ScrollView>
-
-      <BottomNav />
     </Screen>
   );
 }

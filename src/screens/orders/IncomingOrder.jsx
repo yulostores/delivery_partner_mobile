@@ -11,6 +11,7 @@ import client from "@/api/client";
 import { formatCurrency } from "@/lib/format";
 import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
 import { getCurrentRoute } from "@/navigation/navigationRef";
+import { goToTab } from "@/navigation/tabs";
 
 const MAP_BG = { veg: "#0d1a0d", standard: "#0d0d1f" };
 
@@ -45,7 +46,7 @@ export default function IncomingOrder() {
   const skippedRef = useRef(false);
 
   useEffect(() => {
-    if (!order) navigation.navigate("HomeOffline");
+    if (!order) goToTab("HomeOffline");
   }, [order, navigation]);
 
   // Explicit "Skip" tap — goes through the reason picker, which calls the real reject API. Doesn't
@@ -94,7 +95,7 @@ export default function IncomingOrder() {
     } catch (err) {
       if (err.code === "OFFER_EXPIRED" || err.code === "NOT_YOUR_OFFER") {
         skippedRef.current = true;
-        navigation.navigate("HomeOffline");
+        goToTab("HomeOffline");
       } else if (isOrderGone(err)) {
         // Cancelled (or reassigned) while the offer was on screen.
         skippedRef.current = true;

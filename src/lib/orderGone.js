@@ -1,4 +1,5 @@
-import { getCurrentRoute, navigate } from "@/navigation/navigationRef";
+import { getCurrentRoute } from "@/navigation/navigationRef";
+import { goToTab } from "@/navigation/tabs";
 
 // A delivery the rider can no longer do: the customer, restaurant or Yulo cancelled it, or it was
 // reassigned. The backend refuses accept / verify-pickup / deliver on it with one of these codes
@@ -15,7 +16,7 @@ const NOTICES = {
 
 /** Leaves the delivery flow for Home, which shows why. */
 export function leaveGoneOrder(code = "ORDER_CANCELLED") {
-  navigate("HomeOffline", { notice: NOTICES[code] ?? NOTICES.ORDER_CANCELLED, noticeAt: Date.now() });
+  goToTab("HomeOffline", { notice: NOTICES[code] ?? NOTICES.ORDER_CANCELLED, noticeAt: Date.now() });
 }
 
 // The order a delivery-flow screen is showing: the offer card's params are the order itself;
