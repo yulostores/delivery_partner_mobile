@@ -102,7 +102,9 @@ export default function RootNavigator() {
         component={FleetBadgeInfo}
         options={{ presentation: "transparentModal", animation: "fade" }}
       />
-      <Stack.Screen name="OrdersTab" component={OrdersTab} />
+      {/* Bottom-bar destinations keep one instance each, like Home: a fixed id makes navigate()
+          bring the existing screen back instead of stacking another copy on every tap. */}
+      <Stack.Screen name="OrdersTab" component={OrdersTab} getId={() => "orders-tab"} />
       {/* A single route now — fleetType comes from the real order_offer payload (see
           partnerSocket.js), not from which of two routes got registered. */}
       {/* One screen per OFFER (order id + when that offer lapses): a new offer — including the
@@ -129,14 +131,19 @@ export default function RootNavigator() {
       <Stack.Screen name="DeliveryCodCollection" component={CodCollection} />
       <Stack.Screen name="DeliveryPaymentReceived" component={PaymentReceived} />
       <Stack.Screen name="DeliverySummary" component={DeliverySummary} />
-      <Stack.Screen name="Earnings" component={Earnings} initialParams={{ period: "today" }} />
+      <Stack.Screen
+        name="Earnings"
+        component={Earnings}
+        initialParams={{ period: "today" }}
+        getId={() => "earnings"}
+      />
       <Stack.Screen name="EarningsWeekly" component={Earnings} initialParams={{ period: "weekly" }} />
       <Stack.Screen name="EarningsMonthly" component={Earnings} initialParams={{ period: "monthly" }} />
       <Stack.Screen name="EarningsCashDeposit" component={CashDeposit} />
       {/* Was imported but never registered — CashDeposit.jsx's navigate("EarningsDepositConfirmed")
           targeted a route that didn't exist at all. */}
       <Stack.Screen name="EarningsDepositConfirmed" component={DepositConfirmed} />
-      <Stack.Screen name="Profile" component={Profile} />
+      <Stack.Screen name="Profile" component={Profile} getId={() => "profile"} />
       <Stack.Screen name="ProfilePersonalDetails" component={PersonalDetails} />
       <Stack.Screen name="ProfileVehicleDetails" component={VehicleDetails} />
       <Stack.Screen name="ProfileDocuments" component={DocumentsUploaded} />

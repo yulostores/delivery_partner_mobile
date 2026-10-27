@@ -122,7 +122,19 @@ export default function Earnings() {
       </Screen>
     );
   }
-  if (!data) return null;
+  // First load: the bar and title stay on screen. Returning nothing here left a blank page with
+  // no bottom bar until the request finished — on a slow connection the tabs looked dead.
+  if (!data) {
+    return (
+      <Screen edges={["top", "bottom"]}>
+        <AppBar title="Earnings" />
+        <View className="w-full flex-1 items-center justify-center px-6">
+          <Text className="text-center text-sm text-muted-foreground">Loading earnings…</Text>
+        </View>
+        <BottomNav />
+      </Screen>
+    );
+  }
 
   return (
     <Screen edges={["top", "bottom"]}>

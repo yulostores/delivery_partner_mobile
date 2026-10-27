@@ -4,6 +4,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { MapPin } from "lucide-react-native";
 
 import Button from "@/components/ui/Button";
+import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import BottomNav from "@/components/partner/BottomNav";
 import client from "@/api/client";
@@ -110,8 +111,10 @@ export default function IncomingOrder() {
   const isVeg = order.fleetType === "veg";
 
   return (
-    <View className="flex-1 bg-background">
-      <View className="h-11 w-full" style={{ backgroundColor: "#1a1a1a" }} />
+    // Safe-area top and bottom: Android draws the app edge to edge, so without the bottom inset
+    // the bottom bar sat behind the phone's own navigation bar and its taps went to the system
+    // bar instead (Home / Orders / Earn / Profile "not working" on this screen).
+    <Screen edges={["top", "bottom"]}>
 
       <View
         className="h-[320px] w-full overflow-hidden pl-4 pr-4 pt-3"
@@ -191,6 +194,6 @@ export default function IncomingOrder() {
       </View>
 
       <BottomNav />
-    </View>
+    </Screen>
   );
 }
