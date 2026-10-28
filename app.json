@@ -55,6 +55,14 @@
           "microphonePermission": false
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Yulo Delivery Partner uses the camera to capture verification documents and your selfie.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
       "@maplibre/maplibre-react-native",
       [
         "expo-notifications",

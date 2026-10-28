@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, View } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 
 import Button from "@/components/ui/Button";
@@ -115,15 +115,30 @@ export default function Home() {
     return () => clearInterval(intervalRef.current);
   }, [fetchDutyStatus]);
 
+  const { data: profileData, refetch: refetchProfile } = useQuery({
+    queryKey: ["partner", "profile"],
+    queryFn: () => client.get("/partner/profile"),
+  });
+  // Home stays mounted under the tabs, so the cached profile would otherwise keep showing the
+  // pre-approval state (and the "Check your verification status" prompt) after an approval.
+  useFocusEffect(
+    useCallback(() => {
+      refetchProfile();
+    }, [refetchProfile]),
+  );
+
   // App backgrounding doesn't unmount this screen (no fresh mount-effect fires), so on return to
   // the foreground: re-read the duty status, and if on duty rejoin the socket the OS may have
   // dropped and open any offer that arrived meanwhile (fetchDutyStatus does all of that).
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") fetchDutyStatus();
+      if (nextState === "active") {
+        fetchDutyStatus();
+        refetchProfile();
+      }
     });
     return () => subscription.remove();
-  }, [fetchDutyStatus]);
+  }, [fetchDutyStatus, refetchProfile]);
 
   async function handleToggleOnline() {
     if (isOnline === null || toggling) return;
@@ -163,12 +178,9 @@ export default function Home() {
   const online = isOnline === true;
 
   // Same query keys Earnings.jsx/CashDeposit.jsx/PaymentReceived.jsx already use — shares their
-  // cache rather than fetching separately. Only meaningful while online (matches what's actually
-  // rendered below), so gated to avoid a pointless fetch while offline.
-  const { data: profileData } = useQuery({
-    queryKey: ["partner", "profile"],
-    queryFn: () => client.get("/partner/profile"),
-  });
+  // cache rather than fetching separately. Read offline too: today's earnings and the cash still
+  // to deposit don't stop being true when the rider goes off duty (it used to read ₹0.00 · 0 orders
+  // the moment they went offline, right after a day's deliveries).
   const {
     data: earningsData,
     isError: earningsError,
@@ -176,13 +188,12 @@ export default function Home() {
   } = useQuery({
     queryKey: ["partner", "earnings", "today"],
     queryFn: () => client.get("/partner/earnings?period=today"),
-    enabled: online,
   });
   // Cash in hand only exists for cash-on-delivery orders — not fetched or shown while COD is off.
   const { data: cashInHandData } = useQuery({
     queryKey: ["partner", "earnings", "cash-in-hand"],
     queryFn: () => client.get("/partner/earnings/cash-in-hand"),
-    enabled: online && codEnabled,
+    enabled: codEnabled,
   });
   const fleetType = profileData?.partner?.fleetType;
   const fleetLabel = fleetType === "veg" ? "Veg-Only Fleet" : "Standard Fleet";
@@ -190,6 +201,16 @@ export default function Home() {
   // once at login (verifyOtp()) and never refreshed, so it still held the pre-onboarding blank
   // name for the rest of the session even after PersonalInformation.jsx saved the real name.
   const firstName = profileData?.partner?.fullName?.split(" ")[0];
+  // Not approved yet: the app opens on Home for any signed-in partner (RootNavigator can't tell
+  // from the profile cached at sign-in), and "Go online" only answers "Complete verification".
+  // This is the way back into onboarding — the first step for a partner who hasn't sent their
+  // details yet, otherwise the status screen (under review / rejected / approved → training).
+  const verificationStatus = profileData?.partner?.verificationStatus;
+  const needsOnboarding = !online && Boolean(verificationStatus) && verificationStatus !== "approved";
+  const resumeOnboarding = () =>
+    navigation.navigate("Onboarding", {
+      screen: profileData?.partner?.fullName ? "OnboardingStatus" : "OnboardingPersonalInfo",
+    });
 
   return (
     <Screen edges={["top"]}>
@@ -227,6 +248,19 @@ export default function Home() {
             <Text className="text-xs text-muted-foreground">Tap to dismiss</Text>
           </Pressable>
         )}
+        {needsOnboarding && (
+          <Pressable
+            onPress={resumeOnboarding}
+            className="w-full rounded-[20px] border border-primary bg-primary-tint px-4 py-3"
+          >
+            <Text className="font-jakarta-semibold text-sm text-foreground">
+              {profileData?.partner?.fullName ? "Check your verification status" : "Finish your registration"}
+            </Text>
+            <Text className="text-xs text-muted-foreground">
+              You can go online once your details are verified. Tap to continue.
+            </Text>
+          </Pressable>
+        )}
         {online && (
           <View className="h-10 w-full flex-row items-center gap-2 rounded-full bg-success-tint px-4">
             <View className="size-2.5 rounded-full bg-success" />
@@ -247,19 +281,17 @@ export default function Home() {
                 : "font-jakarta-bold text-[36px] leading-[42px] text-muted-foreground"
             }
           >
-            {formatCurrency(online ? Number(earningsData?.totalEarned) || 0 : 0)}
+            {formatCurrency(Number(earningsData?.totalEarned) || 0)}
           </Text>
-          {online && earningsError && (
+          {earningsError && (
             <Text className="text-xs text-destructive" onPress={() => refetchEarnings()}>
               Couldn&rsquo;t load today&rsquo;s earnings — tap to retry
             </Text>
           )}
           <Text className="text-xs text-muted-foreground">
-            {online
-              ? `${earningsData?.orders ?? 0} orders${
-                  codEnabled ? `  ·  Cash in hand: ${formatCurrency(Number(cashInHandData?.cashInHand) || 0)}` : ""
-                }`
-              : "0 orders"}
+            {`${earningsData?.orders ?? 0} ${earningsData?.orders === 1 ? "order" : "orders"}${
+              codEnabled ? `  ·  Cash in hand: ${formatCurrency(Number(cashInHandData?.cashInHand) || 0)}` : ""
+            }`}
           </Text>
         </View>
 

@@ -20,6 +20,7 @@ import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import { usePartnerAuth } from "@/context/PartnerAuthContext";
 import client from "@/api/client";
+import { TRAINING_STATUS_KEY } from "@/context/OnboardingContext";
 import { navigationRef } from "@/navigation/navigationRef";
 
 const MENU_SECTIONS = [
@@ -35,6 +36,7 @@ const MENU_SECTIONS = [
       {
         icon: Leaf,
         label: "Veg Fleet Training",
+        chipKey: "training",
         navigate: (navigation) => navigation.navigate("Onboarding", { screen: "OnboardingTraining" }),
       },
     ],
@@ -82,7 +84,7 @@ function MenuRow({ icon: Icon, label, chip, onPress }) {
           <Text className="font-jakarta-semibold text-xs text-primary-hover">{chip}</Text>
         </View>
       )}
-      <ChevronRight size={20} color="#999999" />
+      {onPress && <ChevronRight size={20} color="#999999" />}
     </Pressable>
   );
 }
@@ -97,6 +99,14 @@ export default function Profile() {
     queryFn: () => client.get("/partner/profile"),
   });
   const partner = data?.partner;
+  // Training done: the row says so and stays put — opening the training screen with nothing left
+  // to watch bounced the rider to Home without a word.
+  const { data: training } = useQuery({
+    queryKey: TRAINING_STATUS_KEY,
+    queryFn: () => client.get("/partner/training/status"),
+    enabled: partner?.verificationStatus === "approved",
+  });
+  const trainingDone = Boolean(training) && !training.moduleId;
   const isVeg = partner?.fleetType === "veg";
   const fleetLabelLong = isVeg ? "Veg-Only Fleet" : "Standard Fleet";
   const fleetLabelShort = isVeg ? "Veg-Only" : "Standard";
@@ -127,7 +137,7 @@ export default function Profile() {
               mock-data problem this step exists to fix, just moved into a comment instead of a
               constant. Real rating only. */}
           <Text className="text-xs text-muted-foreground">
-            ⭐ {partner ? (Number(partner.rating) || 0).toFixed(1) : "—"} · {partner?.totalDeliveries ?? 0} deliveries
+            ⭐ {partner ? (Number(partner.rating) || 0).toFixed(1) : "—"} · {partner?.totalDeliveries ?? 0} {partner?.totalDeliveries === 1 ? "delivery" : "deliveries"}
           </Text>
         </View>
       </View>
@@ -141,8 +151,18 @@ export default function Profile() {
                 key={row.label}
                 icon={row.icon}
                 label={row.label}
-                chip={row.chipKey === "fleet" ? fleetLabelShort : row.chip}
-                onPress={() => (row.navigate ? row.navigate(navigation) : navigation.navigate(row.route))}
+                chip={
+                  row.chipKey === "fleet"
+                    ? fleetLabelShort
+                    : row.chipKey === "training" && trainingDone
+                      ? "Completed"
+                      : row.chip
+                }
+                onPress={
+                  row.chipKey === "training" && trainingDone
+                    ? undefined
+                    : () => (row.navigate ? row.navigate(navigation) : navigation.navigate(row.route))
+                }
               />
             ))}
           </View>

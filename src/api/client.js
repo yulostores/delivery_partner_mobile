@@ -149,8 +149,11 @@ client.interceptors.response.use(
       await clearRefreshToken();
     }
 
-    if (!err.response) {
-      console.error("[DEBUG network error]", {
+    // No response at all (offline, server restarting, request timed out). Logged for development
+    // only, as a warning — a red error banner on every dropped request made riders' network
+    // blips look like crashes; the screen shows its own message either way.
+    if (!err.response && __DEV__) {
+      console.warn("[network error]", {
         message: err.message,
         code: err.code,
         baseURL: err.config?.baseURL,
@@ -158,7 +161,12 @@ client.interceptors.response.use(
       });
     }
 
-    const message = err.response?.data?.message ?? err.message ?? "Request failed";
+    // No response at all: axios's own "Network Error" / "timeout of …ms exceeded" meant nothing
+    // to a rider, and every screen shows this message as-is.
+    const message =
+      err.response?.data?.message ??
+      (err.response ? err.message : "Can’t reach Yulo right now — check your internet connection and try again.") ??
+      "Request failed";
     const apiError = new Error(message);
     apiError.code = code;
     apiError.status = err.response?.status;

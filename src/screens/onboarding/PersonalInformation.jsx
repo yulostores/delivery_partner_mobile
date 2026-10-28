@@ -102,6 +102,9 @@ export default function PersonalInformation() {
 
   const today = new Date();
   const hundredYearsAgo = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
+  // Riders need a driving licence: 18 or older (the server refuses later dates too). Also where
+  // the calendar opens, instead of on this month.
+  const eighteenYearsAgo = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
 
   // Filled from the profile once. Re-filling on every refetch (another screen mounting, a cache
   // invalidation) overwrote whatever the rider had typed so far.
@@ -202,12 +205,25 @@ export default function PersonalInformation() {
           </View>
         </Field>
 
+        {/* Was loaded, checked and saved, and shown on Profile > Personal Details, but never had an
+            input — so it could only ever read "—". */}
+        <Field label="Emergency contact (optional)">
+          <Input
+            value={emergencyPhone}
+            onChangeText={setEmergencyPhone}
+            keyboardType="phone-pad"
+            maxLength={10}
+            placeholder="10-digit mobile number"
+            className="rounded-2xl"
+          />
+        </Field>
+
         <Field label="Date of birth">
           <DatePickerField
             value={dob}
             onChange={setDob}
             placeholder="Select date of birth"
-            maximumDate={today}
+            maximumDate={eighteenYearsAgo}
             minimumDate={hundredYearsAgo}
           />
         </Field>

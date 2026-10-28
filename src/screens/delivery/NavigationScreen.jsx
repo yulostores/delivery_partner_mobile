@@ -35,7 +35,9 @@ export function googleMapsDirectionsUrl(destination, address) {
 // dropoffLocation — raw [lng, lat] pairs added to the backend's
 // buildOfferPayload specifically for this (yulo_backend's
 // deliveryAssignment.service.js).
-export default function NavigationScreen({ stage, mapLabel, onArrive }) {
+// `arriveLabel` (optional): the action button's text for this order, when the stage's default
+// ("Reached restaurant" / "Reached customer") doesn't say what the tap does.
+export default function NavigationScreen({ stage, mapLabel, onArrive, arriveLabel }) {
   const navigation = useNavigation();
   const { params } = useRoute();
   const order = params?.order;
@@ -152,7 +154,9 @@ export default function NavigationScreen({ stage, mapLabel, onArrive }) {
         ) : null}
 
         <Button disabled={busy} onPress={handleArrive}>
-          {busy ? "Please wait…" : isPickup ? "Reached restaurant" : "Reached customer"}
+          {busy
+            ? "Please wait…"
+            : arriveLabel?.(order) ?? (isPickup ? "Reached restaurant" : "Reached customer")}
         </Button>
       </View>
     </View>

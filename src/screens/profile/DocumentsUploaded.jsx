@@ -11,22 +11,27 @@ import client from "@/api/client";
 import { DOCUMENT_TYPES } from "@/mocks/fixtures";
 import { goToTab } from "@/navigation/tabs";
 
-// Every document on this screen is already uploaded — unlike
-// DocumentRow.jsx's 3-state (pending/next/uploaded) logic used on the
-// onboarding hub, so rows are built inline here rather than reusing it.
-function UploadedRow({ label, uploaded }) {
+// One row per KYC document, labelled with where its review stands — it used to say "Uploaded"
+// whether the admin had verified it, rejected it or not looked yet. Not tappable (changes go
+// through "Request Changes" below), so no chevron.
+const REVIEW_CHIP = {
+  verified: { label: "Verified", chip: "bg-success-tint", text: "text-success", tile: "bg-success" },
+  pending: { label: "Under review", chip: "bg-warning-tint", text: "text-warning", tile: "bg-warning" },
+  rejected: { label: "Rejected", chip: "bg-destructive/10", text: "text-destructive", tile: "bg-destructive" },
+  missing: { label: "Not uploaded", chip: "bg-muted", text: "text-muted-foreground", tile: "bg-muted" },
+};
+
+function UploadedRow({ label, status }) {
+  const look = REVIEW_CHIP[status] ?? REVIEW_CHIP.pending;
   return (
     <View className="w-full flex-row items-center gap-3 rounded-[20px] bg-card px-4 py-3 shadow-md shadow-black/10">
-      <View className={`size-10 items-center justify-center rounded-xl ${uploaded ? "bg-success" : "bg-muted"}`}>
-        <FileText size={18} color={uploaded ? "#ffffff" : "#999999"} />
+      <View className={`size-10 items-center justify-center rounded-xl ${look.tile}`}>
+        <FileText size={18} color={status === "missing" ? "#999999" : "#ffffff"} />
       </View>
       <Text className="flex-1 font-jakarta-medium text-base text-foreground">{label}</Text>
-      <View className={`h-7 items-center justify-center rounded-full px-3 ${uploaded ? "bg-success-tint" : "bg-muted"}`}>
-        <Text className={`font-jakarta-semibold text-sm ${uploaded ? "text-success" : "text-muted-foreground"}`}>
-          {uploaded ? "Uploaded" : "Not uploaded"}
-        </Text>
+      <View className={`h-7 items-center justify-center rounded-full px-3 ${look.chip}`}>
+        <Text className={`font-jakarta-semibold text-sm ${look.text}`}>{look.label}</Text>
       </View>
-      <ChevronRight size={20} color="#999999" />
     </View>
   );
 }
@@ -61,7 +66,7 @@ export default function DocumentsUploaded() {
     queryFn: () => client.get("/partner/profile"),
   });
   const documents = data?.partner?.documents ?? [];
-  const uploadedTypes = new Set(documents.map((d) => d.type));
+  const statusOf = (type) => documents.find((d) => d.type === type)?.status ?? "missing";
   const bankAdded = Boolean(data?.partner?.bankDetails?.accountNumber);
 
   return (
@@ -73,7 +78,7 @@ export default function DocumentsUploaded() {
 
       <View className="gap-4 px-6 pb-6 pt-2">
         {DOCUMENT_TYPES.map((doc) => (
-          <UploadedRow key={doc.type} label={doc.label} uploaded={uploadedTypes.has(doc.type)} />
+          <UploadedRow key={doc.type} label={doc.label} status={statusOf(doc.type)} />
         ))}
 
         <BankDetailsRow

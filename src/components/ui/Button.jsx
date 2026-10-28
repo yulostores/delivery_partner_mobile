@@ -5,7 +5,12 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import Text from "./Text";
 
-const containerVariants = cva("items-center justify-center rounded-full flex-row gap-2", {
+// `shadow-none` in the base: the shadow classes set CSS variables, and NativeWind has to wrap a
+// component that sets variables from its FIRST render. Without it, a button that starts
+// disabled (no shadow) and becomes enabled (`shadow-md`) is remounted — and in development the
+// warning NativeWind prints about it crashes the app ("Couldn't find a navigation context").
+// The variant's own shadow class still wins (cn() merges them).
+const containerVariants = cva("items-center justify-center rounded-full flex-row gap-2 shadow-none", {
   variants: {
     variant: {
       default: "bg-primary shadow-md shadow-primary/40",

@@ -28,3 +28,17 @@ export function formatDateTime(dateInput) {
   const day = date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   return `${day}, ${time}`;
 }
+
+// "15 Oct 2001" — a calendar date (date of birth, insurance validity), same form as the date picker.
+export function formatDate(dateInput) {
+  if (!dateInput) return null;
+  return new Date(dateInput).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// "XXXX XXXX 1234" — Aadhaar is shown masked to the last four digits (UIDAI's guidance for
+// displaying it); the full number stays editable only on the form itself.
+export function maskAadhaar(number) {
+  const digits = String(number ?? "").replace(/\D/g, "");
+  if (digits.length < 4) return number || null;
+  return `XXXX XXXX ${digits.slice(-4)}`;
+}

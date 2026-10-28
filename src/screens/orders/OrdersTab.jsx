@@ -105,10 +105,11 @@ export default function OrdersTab() {
               <Package size={26} color="#999999" />
             </View>
             <Text className="text-center font-jakarta-semibold text-base text-foreground">
-              You don&rsquo;t have any orders
+              No active order right now
             </Text>
+            {/* Shown online too (the old "Go online from Home" read as wrong to a rider who was). */}
             <Text className="text-center text-sm text-muted-foreground">
-              Go online from Home and we&rsquo;ll notify you as soon as a new order comes in.
+              While you&rsquo;re online, new delivery requests appear here and on Home.
             </Text>
           </>
         )}

@@ -7,6 +7,7 @@ import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import AppBar from "@/components/partner/AppBar";
 import { cn } from "@/lib/utils";
+import { formatDate, maskAadhaar } from "@/lib/format";
 import client from "@/api/client";
 import { usePartnerAuth } from "@/context/PartnerAuthContext";
 
@@ -80,10 +81,10 @@ export default function PersonalDetails() {
         <Field label="Emergency contact" value={partner?.emergencyPhone} />
         <Field
           label="Date of birth"
-          value={partner?.dateOfBirth ? new Date(partner.dateOfBirth).toDateString() : null}
+          value={formatDate(partner?.dateOfBirth)}
         />
         <GenderField value={partner?.gender} />
-        <Field label="Aadhaar number" value={partner?.aadharNumber} />
+        <Field label="Aadhaar number" value={maskAadhaar(partner?.aadharNumber)} />
         <Field label="PAN number" value={partner?.panNumber} />
 
         <Button

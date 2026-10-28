@@ -27,7 +27,13 @@ function ToggleRow({ label, Icon, enabled, onToggle }) {
         <Icon size={22} color="#666" />
       </View>
       <Text className="flex-1 font-jakarta-medium text-base text-foreground">{label}</Text>
-      <Switch value={enabled} onValueChange={onToggle} trackColor={{ true: "#ff5f00" }} />
+      <Switch
+        value={enabled}
+        onValueChange={onToggle}
+        trackColor={{ true: "#ff5f00", false: "#d4d4d4" }}
+        // Android otherwise paints the knob its own accent blue on the orange track.
+        thumbColor="#ffffff"
+      />
     </View>
   );
 }

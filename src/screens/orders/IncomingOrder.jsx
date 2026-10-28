@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { MapPin } from "lucide-react-native";
 
 import Button from "@/components/ui/Button";
 import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
+import DeliveryMap from "@/components/delivery/DeliveryMap";
 import BottomNav from "@/components/partner/BottomNav";
 import client from "@/api/client";
 import { formatCurrency } from "@/lib/format";
@@ -109,7 +109,10 @@ export default function IncomingOrder() {
 
   if (!order) return null;
 
-  const isVeg = order.fleetType === "veg";
+  // From the ORDER, not the rider: `fleetType` is the rider's own fleet (the server sets it from the
+  // partner being offered), so it called every standard-fleet offer "Non-veg" — an all-veg order
+  // included. What the rider needs to know is whether this order needs the certified veg bag.
+  const isVegOrder = Boolean(order.dedicatedBagRequired || order.vegFleetOptIn);
 
   return (
     // Safe-area top and bottom: Android draws the app edge to edge, so without the bottom inset
@@ -117,25 +120,19 @@ export default function IncomingOrder() {
     // bar instead (Home / Orders / Earn / Profile "not working" on this screen).
     <Screen edges={["top", "bottom"]}>
 
-      <View
-        className="h-[320px] w-full overflow-hidden pl-4 pr-4 pt-3"
-        style={{ backgroundColor: MAP_BG[order.fleetType] }}
-      >
-        <View className="absolute" style={{ left: 55, top: 50, right: 24 }}>
+      {/* The trip on a real map: rider (their live position), restaurant and customer. Was a
+          drawn diagram (two dots and a line on a dark panel) that said nothing about where the
+          order actually is. The key stays over the map; the panel colour shows while tiles load. */}
+      <View className="h-[320px] w-full overflow-hidden" style={{ backgroundColor: MAP_BG[order.fleetType] }}>
+        <DeliveryMap pickup={order.restaurantLocation ?? undefined} destination={order.dropoffLocation ?? undefined} />
+        <View className="absolute left-3 top-3 gap-1 rounded-xl bg-white/90 px-3 py-2" pointerEvents="none">
           <View className="flex-row items-center gap-1.5">
-            <View className="size-4 items-center justify-center rounded-full bg-primary">
-              <View className="size-1.5 rounded-full bg-white" />
-            </View>
-            <Text className="text-[13px] text-[#ccc]">{order.restaurantName}</Text>
-          </View>
-          <View className="flex-row pl-2">
-            <View className="h-40 w-[3px] rounded-full bg-primary" />
+            <View className="size-3 rounded-full bg-primary" />
+            <Text className="text-xs text-foreground">{order.restaurantName}</Text>
           </View>
           <View className="flex-row items-center gap-1.5">
-            <View className="size-4 items-center justify-center rounded-full bg-success">
-              <View className="size-1.5 rounded-full bg-white" />
-            </View>
-            <Text className="text-[13px] text-[#ccc]">Customer drop</Text>
+            <View className="size-3 rounded-full bg-success" />
+            <Text className="text-xs text-foreground">Customer drop</Text>
           </View>
         </View>
       </View>
@@ -145,14 +142,7 @@ export default function IncomingOrder() {
           {order.restaurantName}
         </Text>
 
-        {!isVeg && (
-          <View className="w-full flex-row items-center gap-1.5">
-            <MapPin size={14} color="#8b1a1a" />
-            <Text className="font-jakarta-semibold text-xs text-[#8b1a1a]">Non-veg order</Text>
-          </View>
-        )}
-
-        {isVeg && (
+        {isVegOrder && (
           <View className="h-9 w-full flex-row items-center rounded-lg bg-success-tint px-3">
             <Text className="font-jakarta-semibold text-[13px] text-[#17803d]">
               Veg-Only order — use your certified bag

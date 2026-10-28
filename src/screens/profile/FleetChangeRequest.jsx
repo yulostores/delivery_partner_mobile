@@ -12,19 +12,31 @@ import AppBar from "@/components/partner/AppBar";
 import { cn } from "@/lib/utils";
 import client from "@/api/client";
 
-const REASONS = [
-  "Not enough orders on veg fleet",
-  "Moving to a different zone",
-  "Equipment issue (bag problem)",
-  "Personal reason",
-];
+// Reasons for the direction being asked for — the list used to be the leaving-the-veg-fleet one
+// for everybody, so a standard rider asking to join had to pick "Not enough orders on veg fleet".
+// Must match the server's FLEET_CHANGE_REASONS (fleetChangeRequest.controller.js).
+const REASONS = {
+  standard: [
+    "Not enough orders on veg fleet",
+    "Moving to a different zone",
+    "Equipment issue (bag problem)",
+    "Personal reason",
+  ],
+  veg: [
+    "I want to deliver veg-only orders",
+    "I have a certified veg bag",
+    "Moving to a different zone",
+    "Personal reason",
+  ],
+};
 
 const FLEET_LABEL = { veg: "Veg-Only Fleet", standard: "Standard Fleet" };
 
 export default function FleetChangeRequest() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
-  const [selectedReason, setSelectedReason] = useState(REASONS[0]);
+  // Nothing pre-selected: the rider says why.
+  const [selectedReason, setSelectedReason] = useState(null);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -47,7 +59,7 @@ export default function FleetChangeRequest() {
   const expectedResponseHours = history?.expectedResponseHours;
 
   async function handleSubmit() {
-    if (submitting) return;
+    if (submitting || !selectedReason) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -104,7 +116,7 @@ export default function FleetChangeRequest() {
         </Text>
 
         <View className="w-full gap-2.5">
-          {REASONS.map((reason) => {
+          {REASONS[requestedFleetType].map((reason) => {
             const isSelected = reason === selectedReason;
             return (
               <Pressable
@@ -152,7 +164,7 @@ export default function FleetChangeRequest() {
 
         {error && <Text className="text-center text-sm text-destructive">{error}</Text>}
 
-        <Button className="w-full" disabled={submitting || !currentFleetType} onPress={handleSubmit}>
+        <Button className="w-full" disabled={submitting || !currentFleetType || !selectedReason} onPress={handleSubmit}>
           {submitting ? "Submitting…" : "Submit request"}
         </Button>
       </View>

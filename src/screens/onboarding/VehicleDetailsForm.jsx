@@ -53,6 +53,17 @@ function SegmentedControl({ options, value, onChange }) {
   );
 }
 
+// The minimum the review needs: what the vehicle is and its registration. A non-RTO EV (low-speed
+// scooter) has no registration, so for it only the model is asked for. The server refuses a
+// submission without these too (onboarding.controller.js submitForReview).
+function validateVehicle({ type, model, number }) {
+  if (model.trim().length < 2) return "Enter your vehicle model.";
+  if (type !== "non_rto_2_wheeler" && number.replace(/[\s-]/g, "").length < 6) {
+    return "Enter your vehicle registration number.";
+  }
+  return null;
+}
+
 export default function VehicleDetailsForm() {
   const navigation = useNavigation();
   const { params } = useRoute();
@@ -106,6 +117,11 @@ export default function VehicleDetailsForm() {
     // blank while the partner's real saved vehicle data is untouched server-side; submitting
     // anyway would overwrite it with empty strings.
     if (profileError) return;
+    const validationError = validateVehicle({ type, model, number });
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {

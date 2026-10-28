@@ -1,7 +1,22 @@
+import { Alert } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 
 import NavigationScreen from "./NavigationScreen";
 import client from "@/api/client";
+
+// Resolves true only on "Mark delivered" (Back / tapping outside counts as "Not yet").
+const confirmHandover = () =>
+  new Promise((resolve) => {
+    Alert.alert(
+      "Handed the order over?",
+      "Mark it delivered only once the customer has their order.",
+      [
+        { text: "Not yet", style: "cancel", onPress: () => resolve(false) },
+        { text: "Mark delivered", onPress: () => resolve(true) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    );
+  });
 
 async function handleArrive(queryClient, navigation, order) {
   // COD orders need cash collected before the trip can close; CodCollection.jsx's own "Confirm
@@ -13,8 +28,10 @@ async function handleArrive(queryClient, navigation, order) {
     return;
   }
 
-  // Prepaid: nothing left to collect, so arriving at the customer IS the delivery-completion
-  // moment — there's no separate confirm step on this path, unlike COD's CodCollection.jsx.
+  // Prepaid: nothing left to collect, so this tap completes the delivery. It used to read
+  // "Reached customer" and close the order on arrival, before any handover; the button now says
+  // what it does and asks once, so a tap on arrival can't mark undelivered food delivered.
+  if (!(await confirmHandover())) return;
   // The explicit {} body matters: a truly bodyless POST leaves req.body undefined server-side,
   // and deliverSchema's z.object({...}) rejects undefined even though every field inside it is
   // optional — confirmed live, this 400s without it.
@@ -32,6 +49,7 @@ export default function NavigateToCustomer() {
       stage="dropoff"
       mapLabel="Navigate to customer"
       onArrive={(navigation, order) => handleArrive(queryClient, navigation, order)}
+      arriveLabel={(order) => (order?.payment === "cod" ? "Reached customer" : "Handed over — mark delivered")}
     />
   );
 }
