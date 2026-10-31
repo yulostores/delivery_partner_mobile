@@ -1,109 +1,27 @@
-import { useEffect, useRef, useState } from "react";
-import { View } from "react-native";
-import { Camera, Map, Marker } from "@maplibre/maplibre-react-native";
-import * as Location from "expo-location";
-import { hereStyle } from "@/lib/here";
+import { TurboModuleRegistry, View } from "react-native";
+import { MapPin } from "lucide-react-native";
+import Text from "@/components/ui/Text";
 
-// The live map on the pickup/drop-off navigation screen (NavigationScreen.jsx).
-// Split into .native/.web (see DeliveryMap.web.jsx) because
-// @maplibre/maplibre-react-native has no web implementation at all — a plain
-// `import` of it on web throws a fatal, uncaught exception the instant the
-// module loads. Metro's platform-extension resolution means web never
-// evaluates this file's imports in the first place.
-//
-// Watches the partner's own position independently of the server-reporting
-// loop in src/lib/locationPings.js (every 15s or 50 m), so the on-screen dot
-// moves every few seconds.
-// `pickup` (optional) adds the restaurant as a second pin — the order offer screen shows the whole
-// trip (rider → restaurant → customer) so the rider can judge it before accepting.
-export default function DeliveryMap({ destination, pickup }) {
-  const cameraRef = useRef(null);
-  const [myLocation, setMyLocation] = useState(null);
+// The rider's map (Home, the order offer, navigation) — real MapLibre where this binary has it,
+// a stand-in where it doesn't. Expo Go ships without MapLibre's native code, and the package
+// throws the moment it is imported there (TurboModuleRegistry.getEnforcing on MLRNCameraModule),
+// which used to crash the whole app at launch. So the real map (MapLibreDeliveryMap.jsx) is only
+// `require`d after its native modules are confirmed present — the same check the customer app
+// makes in src/lib/mapLibre.ts.
+const MAPLIBRE_LINKED = ["MLRNMapViewModule", "MLRNCameraModule"].every(
+  (name) => TurboModuleRegistry.get(name) != null,
+);
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const MapLibreDeliveryMap = MAPLIBRE_LINKED ? require("./MapLibreDeliveryMap").default : null;
 
-  useEffect(() => {
-    let subscription;
-    let cancelled = false;
-
-    (async () => {
-      // Permission was already requested (and, if denied, already accepted as
-      // a no-op) when the partner went online — see locationPings.js — so
-      // this only ever silently does nothing extra on top of that, never
-      // prompts a second time.
-      const { status } = await Location.getForegroundPermissionsAsync();
-      if (status !== "granted" || cancelled) return;
-      const watcher = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.Balanced, timeInterval: 4000, distanceInterval: 10 },
-        ({ coords }) => {
-          if (!cancelled) setMyLocation([coords.longitude, coords.latitude]);
-        },
-      );
-      // Left the screen while the watch was starting: stop it now, or it runs on (GPS on,
-      // updating a map that no longer exists) until the app is killed.
-      if (cancelled) watcher.remove();
-      else subscription = watcher;
-    })().catch(() => {});
-
-    return () => {
-      cancelled = true;
-      subscription?.remove();
-    };
-  }, []);
-
-  // No destination (Home's map): centre on the rider once, when the first fix arrives —
-  // initialViewState only applies on mount, before any fix exists. Only once, so the rider can
-  // pan around without the map snapping back every few seconds.
-  const centredOnMeRef = useRef(false);
-  useEffect(() => {
-    if (destination || pickup || !myLocation || centredOnMeRef.current) return;
-    centredOnMeRef.current = true;
-    cameraRef.current?.easeTo({ center: myLocation, zoom: 14, duration: 500 });
-  }, [destination, pickup, myLocation]);
-
-  // Fit both pins in view once both are known; falls back to centering on
-  // whichever one is available so the map never renders with an undefined
-  // camera even before the first location fix comes in.
-  // With a pickup too, all three (rider, restaurant, customer) — or just the two pins until the
-  // rider's own fix arrives.
-  useEffect(() => {
-    const points = [pickup, destination, myLocation].filter(Boolean);
-    if (!destination || points.length < 2) return;
-    const lngs = points.map((p) => p[0]);
-    const lats = points.map((p) => p[1]);
-    cameraRef.current?.fitBounds(
-      [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)],
-      { padding: { top: 60, right: 60, bottom: 60, left: 60 }, duration: 500 },
-    );
-  }, [destination, pickup, myLocation]);
-
+export default function DeliveryMap(props) {
+  if (MapLibreDeliveryMap) return <MapLibreDeliveryMap {...props} />;
   return (
-    <Map style={{ flex: 1 }} mapStyle={hereStyle()}>
-      <Camera
-        ref={cameraRef}
-        initialViewState={{
-          center: pickup ?? destination ?? myLocation ?? [77.5946, 12.9716],
-          zoom: 13,
-        }}
-      />
-
-      {myLocation && (
-        <Marker lngLat={myLocation} anchor="center">
-          <View className="size-4 rounded-full border-2 border-white bg-primary" />
-        </Marker>
-      )}
-
-      {pickup && (
-        <Marker lngLat={pickup} anchor="center">
-          <View className="size-5 items-center justify-center rounded-full border-2 border-white bg-primary">
-            <View className="size-1.5 rounded-full bg-white" />
-          </View>
-        </Marker>
-      )}
-
-      {destination && (
-        <Marker lngLat={destination} anchor="bottom">
-          <View className="size-4 rounded-full bg-success" />
-        </Marker>
-      )}
-    </Map>
+    <View className="flex-1 items-center justify-center gap-1 bg-[#2b2f36]">
+      <MapPin size={26} color="#ffffff" />
+      <Text className="mt-1 text-center text-xs font-jakarta-semibold text-white">
+        The live map needs the full app build.
+      </Text>
+    </View>
   );
 }

@@ -11,7 +11,7 @@ import client from "@/api/client";
 import { formatCurrency } from "@/lib/format";
 import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
 import { getCurrentRoute } from "@/navigation/navigationRef";
-import { goToTab } from "@/navigation/tabs";
+import { goToTab, leaveOffer } from "@/navigation/tabs";
 
 const MAP_BG = { veg: "#0d1a0d", standard: "#0d0d1f" };
 
@@ -70,7 +70,8 @@ export default function IncomingOrder() {
     const onThisOffer =
       (current?.name === "OrdersIncoming" || current?.name === "OrdersReject") &&
       String(current.params?.orderId) === String(order.orderId);
-    if (onThisOffer) navigation.navigate("OrdersSkipConfirmed");
+    // `timedOut`: the rider didn't skip — the offer ran out — and the screen says so.
+    if (onThisOffer) leaveOffer(navigation, "OrdersSkipConfirmed", { timedOut: true });
   }
 
   useEffect(() => {
@@ -91,7 +92,7 @@ export default function IncomingOrder() {
     try {
       await client.post(`/partner/orders/${order.orderId}/accept`);
       skippedRef.current = true;
-      navigation.navigate("DeliveryPickup", { order });
+      leaveOffer(navigation, "DeliveryPickup", { order });
     } catch (err) {
       if (err.code === "OFFER_EXPIRED" || err.code === "NOT_YOUR_OFFER") {
         skippedRef.current = true;
@@ -173,6 +174,15 @@ export default function IncomingOrder() {
         </View>
 
         {error && <Text className="text-center text-sm text-destructive">{error}</Text>}
+
+        {/* The offer lapses and moves to the next rider when this reaches 0 — it was counted but
+            never shown, so the offer simply vanished from under a rider reading it. */}
+        <Text
+          className={`text-center font-jakarta-semibold text-sm ${secondsLeft <= 5 ? "text-destructive" : "text-muted-foreground"}`}
+          accessibilityLiveRegion="polite"
+        >
+          {secondsLeft > 0 ? `Respond within ${secondsLeft}s` : "Offer expired"}
+        </Text>
 
         <View className="w-full flex-row items-center gap-3 pt-2">
           <Button className="flex-1" disabled={accepting} onPress={handleAccept}>

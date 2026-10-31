@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { SKIP_REASONS } from "@/mocks/fixtures";
 import client from "@/api/client";
 import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
-import { goToTab } from "@/navigation/tabs";
+import { goToTab, leaveOffer } from "@/navigation/tabs";
 
 // Presented as a transparentModal (see RootNavigator.jsx), matching
 // FleetBadgeInfo's overlay pattern. Tapping a reason confirms immediately —
@@ -30,7 +30,7 @@ export default function RejectReasonSheet() {
     setError(null);
     try {
       await client.post(`/partner/orders/${params.orderId}/reject`, { reason, notes });
-      navigation.navigate("OrdersSkipConfirmed");
+      leaveOffer(navigation, "OrdersSkipConfirmed");
     } catch (err) {
       if (err.code === "OFFER_EXPIRED" || err.code === "NOT_YOUR_OFFER") {
         goToTab("HomeOffline");

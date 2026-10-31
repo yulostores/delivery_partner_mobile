@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "349593119279",
+    "project_id": "yulostores-cbd74",
+    "storage_bucket": "yulostores-cbd74.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:349593119279:android:8fb368bf7cea8975a2f4da",
+        "android_client_info": {
+          "package_name": "com.yulostores.delivery"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCCmOWAGeZKXjD2edldPx2alvUnNemHHP8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

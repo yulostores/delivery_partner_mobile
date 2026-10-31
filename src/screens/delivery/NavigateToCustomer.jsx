@@ -1,15 +1,24 @@
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 
 import NavigationScreen from "./NavigationScreen";
 import client from "@/api/client";
 
+const HANDOVER_TITLE = "Handed the order over?";
+const HANDOVER_BODY = "Mark it delivered only once the customer has their order.";
+
 // Resolves true only on "Mark delivered" (Back / tapping outside counts as "Not yet").
+// On web react-native-web's Alert.alert does nothing at all, so this promise never settled and
+// the web build's button sat on "Please wait…" for good — the browser's own confirm instead.
 const confirmHandover = () =>
   new Promise((resolve) => {
+    if (Platform.OS === "web") {
+      resolve(window.confirm(`${HANDOVER_TITLE}\n\n${HANDOVER_BODY}`));
+      return;
+    }
     Alert.alert(
-      "Handed the order over?",
-      "Mark it delivered only once the customer has their order.",
+      HANDOVER_TITLE,
+      HANDOVER_BODY,
       [
         { text: "Not yet", style: "cancel", onPress: () => resolve(false) },
         { text: "Mark delivered", onPress: () => resolve(true) },

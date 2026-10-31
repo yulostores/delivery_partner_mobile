@@ -74,13 +74,23 @@ export default function DatePickerField({
   // include. Treat it as if nothing were selected instead.
   const validValue = value && !isDisabled(stripTime(value)) ? value : null;
 
+  // With nothing chosen yet, open on today — pulled into the allowed range. Opening on
+  // maximumDate suited a date of birth (latest allowed = 18 years ago) but put an insurance
+  // expiry, allowed up to 20 years ahead, on a calendar two decades out.
+  const startView = () => {
+    if (validValue) return validValue;
+    if (maximumDate && today > maximumDate) return maximumDate;
+    if (minimumDate && today < minimumDate) return minimumDate;
+    return today;
+  };
+
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState("days"); // "days" | "years"
-  const [viewYear, setViewYear] = useState((validValue ?? maximumDate ?? today).getFullYear());
-  const [viewMonth, setViewMonth] = useState((validValue ?? maximumDate ?? today).getMonth());
+  const [viewYear, setViewYear] = useState(() => startView().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => startView().getMonth());
 
   function openPicker() {
-    const base = validValue ?? maximumDate ?? today;
+    const base = startView();
     setViewYear(base.getFullYear());
     setViewMonth(base.getMonth());
     setMode("days");

@@ -34,11 +34,12 @@ const LOCATION_TASK = "yulo-partner-location";
 // lands well before the previous one goes stale, even if one is dropped.
 const PING_INTERVAL_MS = 15_000;
 
-// Also report after this much movement regardless of the clock. A rider at 30 km/h covers 50 m in
-// six seconds, so on the move this is what actually drives the update rate, and it is what makes
-// the customer's marker glide rather than hop. Stationary at a light, the interval takes over and
-// nothing is wasted.
-const PING_DISTANCE_M = 50;
+// No movement threshold. expo-location's distanceInterval means "only when the location has
+// changed by at least this distance" — a floor on top of the interval, not an alternative to it.
+// At 50 m a rider waiting at the restaurant or for their next order sent nothing at all, the
+// server marked their position stale after 120 s, and offers lost their pickup distance and the
+// rider their distance priority. With 0 the interval alone drives updates, moving or not.
+const PING_DISTANCE_M = 0;
 
 /**
  * Background tasks can be resumed by Android in a fresh JS context after the process was killed,
@@ -102,7 +103,19 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
 // Used when the partner grants "while using the app" but declines "all the time". Strictly worse
 // — it still freezes on screen lock — but it keeps a partner who refused the broader permission
 // visible to customers while they actually have the app open, instead of not tracking them at all.
+// Also what the web build uses: a browser has no background task, and its watch fires only when
+// the position changes — so the last fix is re-sent on the interval while it is running, or a
+// rider standing still would go stale exactly as above.
 let _watcher = null;
+let _heartbeat = null;
+let _lastCoords = null;
+let _lastReportAt = 0;
+
+function reportFromWatch(coords) {
+  _lastCoords = coords;
+  _lastReportAt = Date.now();
+  return report(coords);
+}
 
 async function startForegroundWatch() {
   if (_watcher) return;
@@ -112,13 +125,20 @@ async function startForegroundWatch() {
       timeInterval: PING_INTERVAL_MS,
       distanceInterval: PING_DISTANCE_M,
     },
-    ({ coords }) => report(coords),
+    ({ coords }) => reportFromWatch(coords),
   );
+  // Checked more often than the interval, so timer jitter can't stretch a gap to two intervals.
+  _heartbeat = setInterval(() => {
+    if (_lastCoords && Date.now() - _lastReportAt >= PING_INTERVAL_MS) reportFromWatch(_lastCoords);
+  }, PING_INTERVAL_MS / 3);
 }
 
 function stopForegroundWatch() {
   _watcher?.remove();
   _watcher = null;
+  if (_heartbeat) clearInterval(_heartbeat);
+  _heartbeat = null;
+  _lastCoords = null;
 }
 
 /**
@@ -170,6 +190,14 @@ async function start(ask) {
     ? await Location.requestForegroundPermissionsAsync()
     : await Location.getForegroundPermissionsAsync();
   if (foreground.status !== "granted") return;
+
+  // The web build has no background location task — startLocationUpdatesAsync doesn't exist
+  // there, and the error it threw was swallowed by startOnce, so a rider on web never sent a
+  // single ping. The browser watch is what web can do.
+  if (!TRACKS_IN_BACKGROUND) {
+    await startForegroundWatch();
+    return;
+  }
 
   // Android requires foreground permission to already be granted before the background prompt is
   // allowed to appear, which is why these are sequential rather than concurrent.

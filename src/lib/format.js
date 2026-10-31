@@ -4,12 +4,15 @@ export function formatDuration(totalSeconds) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// Zero-padded on both sides (e.g. "00:42"), unlike formatDuration — used for
-// the Home screen's duty-time clock, which grows past 99 minutes on a long shift.
+// The Home screen's duty-time clock: "00:42", "59:59", then hours — "1:00:00", "35:46:09".
+// Minutes alone grew to "2146:09" on a long shift, which reads as nothing at all.
 export function formatClock(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = Math.floor(totalSeconds % 60);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  const total = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mmss = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return h > 0 ? `${h}:${mmss}` : mmss;
 }
 
 // ₹ with Indian comma grouping (₹2,140.00, ₹8,760.00) — the Earnings

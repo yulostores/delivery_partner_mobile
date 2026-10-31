@@ -1,6 +1,5 @@
 import { Platform, Vibration } from "react-native";
-import Constants from "expo-constants";
-import * as Notifications from "expo-notifications";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 
 import client from "@/api/client";
 import { resumeCurrentOrder } from "@/lib/currentOrder";
@@ -17,10 +16,18 @@ import { resumeCurrentOrder } from "@/lib/currentOrder";
  * everything here quietly does nothing: offers still arrive over the socket while the app is open.
  */
 
+// Expo Go can't receive remote push, and on SDK 58 merely importing expo-notifications there
+// crashes the app at launch (its push-token code needs the ExpoApplication native module, which
+// Expo Go doesn't ship). So it is loaded only in development / store builds; in Expo Go every
+// function below is a no-op and offers still arrive over the socket while the app is open.
+const IN_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Notifications = IN_EXPO_GO || Platform.OS === "web" ? null : require("expo-notifications");
+
 // Channel ids the backend sends to (server/services/push.service.js PUSH_CHANNELS). On Android the
 // importance, sound and vibration belong to the channel, and can't be changed after it is created
 // except by the rider in system settings — so get them right here.
-const CHANNELS = [
+const channels = () => [
   {
     id: "order-offers",
     name: "New delivery requests",
@@ -39,7 +46,7 @@ let _configured = false;
 
 /** Call once at startup (App.js). Safe to call again. */
 export function configureNotifications() {
-  if (_configured || Platform.OS === "web") return;
+  if (_configured || !Notifications) return;
   _configured = true;
 
   // While the app is open the offer screen itself is the alert (partnerSocket.js navigates to it),
@@ -57,7 +64,7 @@ export function configureNotifications() {
   });
 
   if (Platform.OS === "android") {
-    for (const { id, ...channel } of CHANNELS) {
+    for (const { id, ...channel } of channels()) {
       Notifications.setNotificationChannelAsync(id, {
         ...channel,
         sound: "default",
@@ -80,7 +87,7 @@ export function configureNotifications() {
  * because a prompt then sends the app to the background and back, which fires resume again.
  */
 export async function registerPushToken({ ask = false } = {}) {
-  if (Platform.OS === "web") return;
+  if (!Notifications) return;
   try {
     let { status } = await Notifications.getPermissionsAsync();
     if (status !== "granted" && ask) {

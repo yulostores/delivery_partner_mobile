@@ -1,4 +1,4 @@
-import { StackActions } from "@react-navigation/native";
+import { CommonActions, StackActions } from "@react-navigation/native";
 
 import { navigationRef } from "@/navigation/navigationRef";
 
@@ -20,4 +20,24 @@ export const TAB_ROUTES = ["HomeOffline", "OrdersTab", "Earnings", "Profile"];
 export function goToTab(tab, params) {
   if (!navigationRef.isReady()) return;
   navigationRef.dispatch(StackActions.popTo(MAIN, { screen: tab, params }));
+}
+
+// The screens of a single order offer: the offer itself and its skip-reason sheet.
+const OFFER_ROUTES = new Set(["OrdersIncoming", "OrdersReject"]);
+
+/**
+ * Leaves an order offer for whatever comes next (pickup after Accept, the skipped / expired
+ * screen) and drops the offer from the history. With a plain navigate() the offer stayed
+ * underneath, so Back from the pickup screen reopened an already-accepted offer frozen on
+ * "Accepting…", with Accept and Skip still on screen.
+ */
+export function leaveOffer(navigation, name, params) {
+  navigation.dispatch((state) => {
+    const routes = state.routes.filter((r) => !OFFER_ROUTES.has(r.name));
+    return CommonActions.reset({
+      ...state,
+      routes: [...routes, { name, params }],
+      index: routes.length,
+    });
+  });
 }
