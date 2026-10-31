@@ -67,7 +67,9 @@ export function configureNotifications() {
     for (const { id, ...channel } of channels()) {
       Notifications.setNotificationChannelAsync(id, {
         ...channel,
-        sound: "default",
+        // No `sound`: leaving it out is what gives a channel the system's default sound. The
+        // string "default" is read as a custom sound file the app doesn't ship, and the channel
+        // failed to be created.
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       }).catch(() => {});
     }

@@ -46,6 +46,7 @@ export const linking = {
       DeliveryPickup: "delivery/pickup",
       DeliveryVegCheckpoint: "delivery/veg-checkpoint",
       DeliveryNavigate: "delivery/navigate",
+      DeliveryHandover: "delivery/handover",
       DeliveryCodCollection: "delivery/cod-collection",
       DeliveryPaymentReceived: "delivery/payment-received",
       DeliverySummary: "delivery/summary",

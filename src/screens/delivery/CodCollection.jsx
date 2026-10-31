@@ -7,9 +7,11 @@ import Button from "@/components/ui/Button";
 import Screen from "@/components/ui/Screen";
 import Text from "@/components/ui/Text";
 import AppBar from "@/components/partner/AppBar";
+import OtpInput from "@/components/partner/OtpInput";
 import client from "@/api/client";
 import { formatCurrency } from "@/lib/format";
 import { isOrderGone, leaveGoneOrder } from "@/lib/orderGone";
+import { deliveryCodeError } from "@/lib/deliveryCode";
 import { goToTab } from "@/navigation/tabs";
 
 // The server's limit on a reported collection (deliverSchema in
@@ -35,6 +37,8 @@ export default function CodCollection() {
   const queryClient = useQueryClient();
   const order = params?.order;
   const [cashReceived, setCashReceived] = useState(false);
+  // The customer's delivery code — required to close a cash order as much as a prepaid one.
+  const [otp, setOtp] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -45,7 +49,7 @@ export default function CodCollection() {
   if (!order) return null;
 
   async function handleConfirmDelivery() {
-    if (!cashReceived || submitting) return;
+    if (!cashReceived || otp.length !== 4 || submitting) return;
     const { amount, error: amountError } = codCollectedFor(order.codAmount);
     if (amountError) {
       setError(amountError);
@@ -58,7 +62,7 @@ export default function CodCollection() {
       // deliberately doesn't hard-validate the collected amount against order.codAmount (see
       // deliverOrder's codDiscrepancy comment), so this always reports the known order amount
       // rather than a separately-typed figure the partner could get wrong by typo.
-      await client.post(`/partner/orders/${order.orderId}/deliver`, { codCollected: amount });
+      await client.post(`/partner/orders/${order.orderId}/deliver`, { codCollected: amount, otp });
       // Home.jsx's earnings/cash-in-hand queries fetch once (before this delivery even happened)
       // and sit on a 60s staleTime — without this, Earnings.jsx and PaymentReceived.jsx (which
       // share those exact query keys) would keep painting that stale pre-delivery snapshot instead
@@ -67,7 +71,10 @@ export default function CodCollection() {
       navigation.navigate("DeliveryPaymentReceived", { order });
     } catch (err) {
       if (isOrderGone(err)) leaveGoneOrder(err.code);
-      else setError(err.message);
+      else {
+        setOtp("");
+        setError(deliveryCodeError(err));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -97,11 +104,23 @@ export default function CodCollection() {
           {cashReceived ? "Cash received ✓" : "Mark cash received"}
         </Button>
 
+        <View className="w-full gap-2 rounded-[20px] bg-card px-4 py-3.5 shadow-md shadow-black/10">
+          <Text className="font-jakarta-semibold text-sm text-foreground">Customer's delivery code</Text>
+          <OtpInput
+            length={4}
+            value={otp}
+            onChange={setOtp}
+            boxHeight={48}
+            className="justify-start"
+            accessibilityLabel="Customer's delivery code"
+          />
+        </View>
+
         {error && <Text className="text-center text-sm text-destructive">{error}</Text>}
 
         <Button
-          variant={cashReceived ? "default" : "disabled"}
-          disabled={!cashReceived || submitting}
+          variant={cashReceived && otp.length === 4 ? "default" : "disabled"}
+          disabled={!cashReceived || otp.length !== 4 || submitting}
           onPress={handleConfirmDelivery}
         >
           {submitting ? "Confirming…" : "Confirm delivery"}

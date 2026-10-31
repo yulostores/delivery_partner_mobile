@@ -27,6 +27,7 @@ import GoToPickup from "@/screens/delivery/GoToPickup";
 import VegCheckpoint from "@/screens/delivery/VegCheckpoint";
 import NavigateToCustomer from "@/screens/delivery/NavigateToCustomer";
 import CodCollection from "@/screens/delivery/CodCollection";
+import DeliveryHandover from "@/screens/delivery/DeliveryHandover";
 import PaymentReceived from "@/screens/delivery/PaymentReceived";
 import DeliverySummary from "@/screens/delivery/DeliverySummary";
 import Earnings from "@/screens/earnings/Earnings";
@@ -147,6 +148,7 @@ export default function RootNavigator() {
       <Stack.Screen name="DeliveryPickup" component={GoToPickup} />
       <Stack.Screen name="DeliveryVegCheckpoint" component={VegCheckpoint} />
       <Stack.Screen name="DeliveryNavigate" component={NavigateToCustomer} />
+      <Stack.Screen name="DeliveryHandover" component={DeliveryHandover} />
       <Stack.Screen name="DeliveryCodCollection" component={CodCollection} />
       <Stack.Screen name="DeliveryPaymentReceived" component={PaymentReceived} />
       <Stack.Screen name="DeliverySummary" component={DeliverySummary} />

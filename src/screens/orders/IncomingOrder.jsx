@@ -40,7 +40,19 @@ export default function IncomingOrder() {
   // but bail to Home rather than crash on order.fleetType below if it ever is.
   const order = params?.orderId ? params : null;
 
-  const [secondsLeft, setSecondsLeft] = useState(order?.countdownSeconds ?? 0);
+  // Counted down to a fixed deadline, not from when this screen opened: an offer that reached
+  // the app late (it was in the background, or reopened from a notification) used to restart a
+  // full countdown on an offer the server had already expired — the rider tapped Accept on a
+  // dead offer. The server's offerExpiresAt caps it; countdownSeconds (what was left when the
+  // payload was built) guards against a phone clock running slow.
+  const deadlineRef = useRef(null);
+  if (deadlineRef.current == null && order) {
+    const byCountdown = Date.now() + (order.countdownSeconds ?? 0) * 1000;
+    const byServer = order.offerExpiresAt ? Date.parse(order.offerExpiresAt) : NaN;
+    deadlineRef.current = Number.isFinite(byServer) ? Math.min(byCountdown, byServer) : byCountdown;
+  }
+  const remaining = () => Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000));
+  const [secondsLeft, setSecondsLeft] = useState(() => (order ? remaining() : 0));
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState(null);
   const skippedRef = useRef(false);
@@ -80,7 +92,8 @@ export default function IncomingOrder() {
       handleTimeout();
       return;
     }
-    const id = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    // Re-read from the deadline each tick, so time spent with the app paused still counts.
+    const id = setTimeout(() => setSecondsLeft(remaining()), 1000);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondsLeft, order]);
@@ -95,8 +108,10 @@ export default function IncomingOrder() {
       leaveOffer(navigation, "DeliveryPickup", { order });
     } catch (err) {
       if (err.code === "OFFER_EXPIRED" || err.code === "NOT_YOUR_OFFER") {
+        // Too late — say so. This used to drop the rider on Home without a word, so an Accept
+        // that didn't take looked like the app ignoring them.
         skippedRef.current = true;
-        goToTab("HomeOffline");
+        leaveOffer(navigation, "OrdersSkipConfirmed", { timedOut: true });
       } else if (isOrderGone(err)) {
         // Cancelled (or reassigned) while the offer was on screen.
         skippedRef.current = true;
