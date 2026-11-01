@@ -71,6 +71,54 @@ function DeliveryLine({ d }) {
   );
 }
 
+const weekRange = (start, end) => {
+  const fmt = (d) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  return `${fmt(start)} – ${fmt(end)}`;
+};
+
+// Yulo pays riders weekly by bank / UPI. Each week shows what it came to and whether it has been
+// paid: "Paid on <date> · Ref <reference>" once the admin records the transfer (the weekly report
+// in the super admin portal), "Payout pending" before, "This week" while it is still running.
+function WeeklyPayouts({ payouts }) {
+  if (!payouts?.length) return null;
+  return (
+    <View className="w-full gap-1 rounded-[20px] bg-card p-4 shadow-md shadow-black/10">
+      <Text className="font-jakarta-bold text-base text-foreground">Weekly payouts</Text>
+      {payouts
+        .filter((p) => p.deliveriesCount > 0 || Number(p.netPayable) > 0 || p.status === "paid")
+        .map((p, i) => {
+          const paid = p.status === "paid";
+          const status = paid
+            ? `Paid on ${new Date(p.paidAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+            : p.weekEnded
+              ? "Payout pending"
+              : "This week · in progress";
+          return (
+            <View key={String(p._id)}>
+              {i > 0 && <View className="h-px w-full bg-border" />}
+              <View className="w-full flex-row items-start justify-between gap-3 py-2.5">
+                <View className="flex-1 gap-0.5">
+                  <Text className="font-jakarta-semibold text-sm text-foreground">{weekRange(p.periodStart, p.periodEnd)}</Text>
+                  <Text className="text-xs text-muted-foreground">
+                    {p.deliveriesCount} {p.deliveriesCount === 1 ? "delivery" : "deliveries"}
+                    {Number(p.tips) > 0 ? ` · tips ${money(p.tips)}` : ""}
+                  </Text>
+                  <Text className={cn("text-xs", paid ? "font-jakarta-semibold text-[#17803d]" : "text-muted-foreground")}>
+                    {status}
+                  </Text>
+                  {paid && p.paymentReference ? (
+                    <Text className="text-xs text-muted-foreground">Ref {p.paymentReference}</Text>
+                  ) : null}
+                </View>
+                <Text className="font-jakarta-bold text-sm text-foreground">{money(p.netPayable)}</Text>
+              </View>
+            </View>
+          );
+        })}
+    </View>
+  );
+}
+
 export default function Earnings() {
   const navigation = useNavigation();
   const { params } = useRoute();
@@ -103,6 +151,11 @@ export default function Earnings() {
     enabled: codEnabled,
   });
   const cashInHand = cashInHandData?.cashInHand;
+  // Weekly payouts and whether Yulo has paid them — refreshed whenever the screen is opened.
+  const { data: payoutsData } = useQuery({
+    queryKey: ["partner", "earnings", "payouts"],
+    queryFn: () => client.get("/partner/earnings/payouts"),
+  });
 
   // A failed fetch shows a retry rather than a blank page.
   if (isError) {
@@ -206,6 +259,8 @@ export default function Earnings() {
             </Text>
           )}
         </View>
+
+        <WeeklyPayouts payouts={payoutsData?.payouts} />
 
         {codEnabled && (
           <Pressable
