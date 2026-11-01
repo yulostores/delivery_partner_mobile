@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import { useQueryClient } from "@tanstack/react-query";
+import { useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import Button from "@/components/ui/Button";
 import Screen from "@/components/ui/Screen";
@@ -28,10 +28,33 @@ export default function DeliveryHandover() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [locked, setLocked] = useState(false);
+  // Set once this rider delivered it themselves — the summary screen opens on top of this one,
+  // and this screen must not then read the (now finished) order as "closed by support".
+  const deliveredRef = useRef(false);
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     if (!order) goToTab("HomeOffline");
   }, [order, navigation]);
+
+  // Yulo support can close this delivery for the rider (customer unreachable, or the rider locked
+  // out after wrong codes — PATCH /admin/orders/:id/mark-delivered). Nothing is pushed to the rider
+  // when that happens, so while this screen is open it checks whether the order is still theirs and
+  // goes back to Home once it isn't — the rider used to be left on a screen with no way out.
+  const { data: current } = useQuery({
+    queryKey: ["partner", "orders", "current", "handover", order?.orderId],
+    queryFn: () => client.get("/partner/orders/current"),
+    enabled: Boolean(order) && isFocused && !submitting,
+    refetchInterval: locked ? 5000 : 15000,
+  });
+  useEffect(() => {
+    if (!order || !current || deliveredRef.current || !isFocused) return;
+    const stillMine = current.kind === "assigned" && String(current.order?.orderId) === String(order.orderId);
+    if (!stillMine) {
+      queryClient.invalidateQueries({ queryKey: ["partner", "earnings"] });
+      goToTab("HomeOffline", { notice: "Support closed this delivery — no further action needed.", noticeAt: Date.now() });
+    }
+  }, [current, order, queryClient, isFocused]);
 
   if (!order) return null;
 
@@ -43,6 +66,7 @@ export default function DeliveryHandover() {
     setError(null);
     try {
       await client.post(`/partner/orders/${order.orderId}/deliver`, { otp });
+      deliveredRef.current = true;
       // Same invalidation as CodCollection.jsx: Home's earnings queries would otherwise keep their
       // pre-delivery snapshot for up to a minute.
       queryClient.invalidateQueries({ queryKey: ["partner", "earnings"] });
